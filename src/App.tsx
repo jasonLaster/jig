@@ -4029,6 +4029,7 @@ type WorkspaceLibrarySidebarProps = {
   catalogModels: CatalogSeedModel[];
   convexEnabled: boolean;
   designChecks: ReactNode | null;
+  isBrochureOpen: boolean;
   isCollapsed: boolean;
   isCompactOpen: boolean;
   selectedModelId: string;
@@ -4046,6 +4047,7 @@ function WorkspaceLibrarySidebar({
   catalogModels,
   convexEnabled,
   designChecks,
+  isBrochureOpen,
   isCollapsed,
   isCompactOpen,
   selectedModelId,
@@ -4078,6 +4080,12 @@ function WorkspaceLibrarySidebar({
       );
     }
   }, [hasDesignChecks, selectedModelId]);
+
+  useEffect(() => {
+    if (isBrochureOpen) {
+      setActiveSection("brochures");
+    }
+  }, [isBrochureOpen]);
 
   if (isCollapsed) {
     return (
@@ -5668,6 +5676,7 @@ export default function App({
               />
             ) : null
           }
+          isBrochureOpen={assemblyMode === "brochure"}
           isCollapsed={isCompactWorkspace ? false : isLibrarySidebarCollapsed}
           isCompactOpen={isCompactWorkspace && isCompactLibraryOpen}
           selectedModelId={selectedModelId}
