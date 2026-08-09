@@ -4241,6 +4241,7 @@ function isVisibleSavedVersion(version: SavedLibraryVersion) {
 }
 
 type WorkspaceLibrarySidebarProps = {
+  activeSection: WorkspaceLibrarySection;
   activeVersionId: Id<"versions"> | null;
   brochures?: SavedBrochure[];
   catalogModels: CatalogSeedModel[];
@@ -4255,10 +4256,18 @@ type WorkspaceLibrarySidebarProps = {
   onOpenModel: (modelId: string) => void;
   onOpenBrochure: (brochure: SavedBrochure) => void;
   onOpenVersion: (version: SavedLibraryVersion) => void;
+  onSectionChange: (section: WorkspaceLibrarySection) => void;
   onToggleCollapsed: () => void;
 };
 
+type WorkspaceLibrarySection =
+  | "models"
+  | "versions"
+  | "brochures"
+  | "checks";
+
 function WorkspaceLibrarySidebar({
+  activeSection,
   activeVersionId,
   brochures,
   catalogModels,
@@ -4273,11 +4282,9 @@ function WorkspaceLibrarySidebar({
   onOpenModel,
   onOpenBrochure,
   onOpenVersion,
+  onSectionChange,
   onToggleCollapsed,
 }: WorkspaceLibrarySidebarProps) {
-  const [activeSection, setActiveSection] = useState<
-    "models" | "versions" | "brochures" | "checks"
-  >("models");
   const [query, setQuery] = useState("");
   const hasDesignChecks = designChecks !== null;
   const filteredModels = useMemo(
@@ -4289,20 +4296,16 @@ function WorkspaceLibrarySidebar({
     "Selected model";
 
   useEffect(() => {
-    if (hasDesignChecks) {
-      setActiveSection("checks");
-    } else {
-      setActiveSection((current) =>
-        current === "checks" ? "models" : current,
-      );
+    if (!hasDesignChecks && activeSection === "checks") {
+      onSectionChange("models");
     }
-  }, [hasDesignChecks, selectedModelId]);
+  }, [activeSection, hasDesignChecks, onSectionChange]);
 
   useEffect(() => {
     if (isBrochureOpen) {
-      setActiveSection("brochures");
+      onSectionChange("brochures");
     }
-  }, [isBrochureOpen]);
+  }, [isBrochureOpen, onSectionChange]);
 
   if (isCollapsed) {
     return (
@@ -4323,7 +4326,7 @@ function WorkspaceLibrarySidebar({
           aria-label="Show models"
           className={activeSection === "models" ? "active" : ""}
           onClick={() => {
-            setActiveSection("models");
+            onSectionChange("models");
             onToggleCollapsed();
           }}
           title="Jig Library"
@@ -4335,7 +4338,7 @@ function WorkspaceLibrarySidebar({
           aria-label="Show saved versions"
           className={activeSection === "versions" ? "active" : ""}
           onClick={() => {
-            setActiveSection("versions");
+            onSectionChange("versions");
             onToggleCollapsed();
           }}
           title="Saved Versions"
@@ -4347,7 +4350,7 @@ function WorkspaceLibrarySidebar({
           aria-label="Show brochures"
           className={activeSection === "brochures" ? "active" : ""}
           onClick={() => {
-            setActiveSection("brochures");
+            onSectionChange("brochures");
             onToggleCollapsed();
           }}
           title="Brochures"
@@ -4360,7 +4363,7 @@ function WorkspaceLibrarySidebar({
             aria-label="Show design checks"
             className={activeSection === "checks" ? "active" : ""}
             onClick={() => {
-              setActiveSection("checks");
+              onSectionChange("checks");
               onToggleCollapsed();
             }}
             title="Design checks"
@@ -4393,7 +4396,7 @@ function WorkspaceLibrarySidebar({
       <nav className="workspace-library-nav" aria-label="Workspace library sections">
         <button
           className={activeSection === "models" ? "active" : ""}
-          onClick={() => setActiveSection("models")}
+          onClick={() => onSectionChange("models")}
           type="button"
         >
           <Layers3 aria-hidden="true" />
@@ -4401,7 +4404,7 @@ function WorkspaceLibrarySidebar({
         </button>
         <button
           className={activeSection === "versions" ? "active" : ""}
-          onClick={() => setActiveSection("versions")}
+          onClick={() => onSectionChange("versions")}
           type="button"
         >
           <Clock3 aria-hidden="true" />
@@ -4409,7 +4412,7 @@ function WorkspaceLibrarySidebar({
         </button>
         <button
           className={activeSection === "brochures" ? "active" : ""}
-          onClick={() => setActiveSection("brochures")}
+          onClick={() => onSectionChange("brochures")}
           type="button"
         >
           <Images aria-hidden="true" />
@@ -4418,7 +4421,7 @@ function WorkspaceLibrarySidebar({
         {hasDesignChecks ? (
           <button
             className={activeSection === "checks" ? "active" : ""}
-            onClick={() => setActiveSection("checks")}
+            onClick={() => onSectionChange("checks")}
             type="button"
           >
             <SlidersHorizontal aria-hidden="true" />
@@ -5028,6 +5031,8 @@ export default function App({
   );
   const [isLibrarySidebarCollapsed, setIsLibrarySidebarCollapsed] =
     useState(false);
+  const [activeLibrarySection, setActiveLibrarySection] =
+    useState<WorkspaceLibrarySection>("checks");
   const [isInspectorCollapsed, setIsInspectorCollapsed] = useState(false);
   const [isAuditExpanded, setIsAuditExpanded] = useState(true);
   const [isStructureExpanded, setIsStructureExpanded] = useState(true);
@@ -5890,6 +5895,7 @@ export default function App({
           />
         ) : null}
         <WorkspaceLibrarySidebar
+          activeSection={activeLibrarySection}
           activeVersionId={activeVersionId}
           brochures={savedBrochures}
           catalogModels={catalogSeedModels}
@@ -5932,6 +5938,7 @@ export default function App({
           onOpenModel={openModel}
           onOpenBrochure={openSavedBrochure}
           onOpenVersion={openLibraryVersion}
+          onSectionChange={setActiveLibrarySection}
           onToggleCollapsed={() =>
             isCompactWorkspace
               ? setIsCompactLibraryOpen(false)

@@ -55,5 +55,14 @@ test("opens every woodworking model through the Jig library", async ({ page }) =
     await expect(page.getByRole("heading", { name: model })).toBeVisible();
     await expect(page.getByLabel(`${model} model viewer`)).toBeVisible();
     await expect(page.locator(".scene-panel canvas")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Jig Library", exact: true }),
+    ).toHaveClass(/active/);
+    await expect(
+      page.getByRole("button", { name: "Design checks", exact: true }),
+    ).not.toHaveClass(/active/);
+    await expect(
+      page.getByRole("button", { name: `Open ${model}` }),
+    ).toHaveAttribute("aria-current", "page");
   }
 });
