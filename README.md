@@ -15,7 +15,6 @@ The active catalog lives in `public/models/index.json`:
 - `whisperer` — Whisperer
 - `hover-dining-table` — X-Hover Dining Table
 - `wave-dining-table` — The Wave
-- `concentric-tube-jig` — Concentric Tube Jig
 
 Each model owns its public configuration and registered STL under
 `public/models/<model-id>/`. Table geometry, fabrication layouts, audits, and

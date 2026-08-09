@@ -2,7 +2,7 @@
   "id": "whisperer",
   "name": "Whisperer",
   "subtitle": "Plan-derived MCM dining table",
-  "description": "A parametric 1:10 model of the 72 × 40 inch mid-century dining table: a deeply beveled 1 3/4 inch top, four 15-degree splayed and tapered legs, a recessed four-apron frame, and four independent leveling feet.",
+  "description": "A parametric 1:10 solid-oak model of the 72 × 40 inch mid-century dining table: a deeply beveled 1 3/4 inch top, four 15-degree splayed and tapered legs, a recessed four-apron frame, and four independent leveling feet.",
   "viewer": "dining-table-v1",
   "stl": {
     "fileName": "whisperer.stl",

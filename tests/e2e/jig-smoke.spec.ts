@@ -5,7 +5,6 @@ const WOODWORKING_MODELS = [
   "Whisperer",
   "X-Hover Dining Table",
   "The Wave",
-  "Concentric Tube Jig",
 ] as const;
 
 test("opens Jig on the woodworking catalog and keeps legacy print models out", async ({
@@ -36,6 +35,7 @@ test("opens Jig on the woodworking catalog and keeps legacy print models out", a
     "Japandi Tray",
     "Simple Box",
     "Door Lock Adapter",
+    "Concentric Tube Jig",
   ]) {
     await expect(
       page.getByRole("button", { name: `Open ${legacyModel}` }),

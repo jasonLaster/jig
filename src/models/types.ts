@@ -113,13 +113,6 @@ export type DoorLockAdapterGeometry = {
   minimumWallThickness: number;
 };
 
-export type ConcentricTubeJigGeometry = {
-  mainAxis: { x: number; y: number; z: number };
-  radialSegments: number;
-  minimumWallThickness: number;
-  tubeCount: number;
-};
-
 export type DiningTableGeometry = {
   mainAxis: { x: number; y: number; z: number };
   cornerSegments: number;
@@ -144,7 +137,6 @@ export type SupportedViewer =
   | "japandi-tray-v1"
   | "simple-box-v1"
   | "door-lock-adapter-v1"
-  | "concentric-tube-jig-v1"
   | "dining-table-v1"
   | "hover-dining-table-v1";
 
@@ -193,11 +185,6 @@ export type DoorLockAdapterModelDefinition = BaseModelDefinition & {
   geometry: DoorLockAdapterGeometry;
 };
 
-export type ConcentricTubeJigModelDefinition = BaseModelDefinition & {
-  viewer: "concentric-tube-jig-v1";
-  geometry: ConcentricTubeJigGeometry;
-};
-
 export type DiningTableModelDefinition = BaseModelDefinition & {
   viewer: "dining-table-v1";
   geometry: DiningTableGeometry;
@@ -213,7 +200,6 @@ export type ModelDefinition =
   | TrayModelDefinition
   | SimpleBoxModelDefinition
   | DoorLockAdapterModelDefinition
-  | ConcentricTubeJigModelDefinition
   | DiningTableModelDefinition
   | HoverDiningTableModelDefinition;
 

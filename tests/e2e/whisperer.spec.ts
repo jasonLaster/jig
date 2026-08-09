@@ -10,11 +10,17 @@ import {
 } from "../../src/models/diningTable";
 import { getDefaultParams } from "../../src/models/shared";
 import type { DiningTableModelDefinition } from "../../src/models/types";
+import { getWoodSpeciesForModel } from "../../src/woodTexture";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const model = JSON.parse(
   fs.readFileSync(path.join(root, "public/models/whisperer/model.json"), "utf8"),
 ) as DiningTableModelDefinition;
+
+test("classifies the Whisperer as solid oak across its model surfaces", () => {
+  expect(getWoodSpeciesForModel(model.id)).toBe("oak");
+  expect(model.description).toContain("solid-oak");
+});
 
 test("builds the Whisperer on four independent leveling feet", () => {
   const params = getDefaultParams(model);

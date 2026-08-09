@@ -20,11 +20,6 @@
       "id": "wave-dining-table",
       "name": "The Wave",
       "configUrl": "/models/wave-dining-table/model.json"
-    },
-    {
-      "id": "concentric-tube-jig",
-      "name": "Concentric Tube Jig",
-      "configUrl": "/models/concentric-tube-jig/model.json"
     }
   ]
 }

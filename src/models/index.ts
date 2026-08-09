@@ -16,11 +16,6 @@ import {
   getDoorLockAdapterParameterLimits,
 } from "./doorLockAdapter";
 import {
-  getConcentricTubeJigAuditValue,
-  getConcentricTubeJigDimensions,
-  getConcentricTubeJigParameterLimits,
-} from "./concentricTubeJig";
-import {
   getDiningTableAuditValue,
   getDiningTableDimensions,
   getDiningTableParameterLimits,
@@ -63,10 +58,6 @@ export {
   createDoorLockAdapterGeometry,
   updateDoorLockAdapterGuide,
 } from "./doorLockAdapter";
-export {
-  createConcentricTubeJigGeometry,
-  updateConcentricTubeJigGuide,
-} from "./concentricTubeJig";
 export {
   createDiningTableHardwareGeometries,
   createDiningTableWoodGeometry,
@@ -114,9 +105,6 @@ function getAuditValue(
   if (model.viewer === "door-lock-adapter-v1") {
     return getDoorLockAdapterAuditValue(check, params, unit, model);
   }
-  if (model.viewer === "concentric-tube-jig-v1") {
-    return getConcentricTubeJigAuditValue(check, params, unit, model);
-  }
   if (model.viewer === "dining-table-v1") {
     return getDiningTableAuditValue(check, params, unit);
   }
@@ -149,9 +137,6 @@ export function getParameterLimits(
   if (model.viewer === "door-lock-adapter-v1") {
     return getDoorLockAdapterParameterLimits(model, params, key);
   }
-  if (model.viewer === "concentric-tube-jig-v1") {
-    return getConcentricTubeJigParameterLimits(model, params, key);
-  }
   if (model.viewer === "dining-table-v1") {
     return getDiningTableParameterLimits(model, params, key);
   }
@@ -172,9 +157,6 @@ export function getModelDimensions(
 ): ModelDimensions {
   if (model.viewer === "door-lock-adapter-v1") {
     return getDoorLockAdapterDimensions(params);
-  }
-  if (model.viewer === "concentric-tube-jig-v1") {
-    return getConcentricTubeJigDimensions(params, model);
   }
   if (model.viewer === "dining-table-v1") {
     return getDiningTableDimensions(params);

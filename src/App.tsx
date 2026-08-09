@@ -71,7 +71,6 @@ import {
   applyHolderMorph,
   applyTrayMorph,
   buildAuditItems,
-  createConcentricTubeJigGeometry,
   createDiningTableHardwareGeometries,
   createDiningTableWoodGeometry,
   getDiningTableStructuralAssessment,
@@ -98,7 +97,6 @@ import {
   getStatusItems,
   snapGridfinityDimension,
   updateDoorLockAdapterGuide,
-  updateConcentricTubeJigGuide,
   updateDiningTableGuide,
   updateHoverDiningTableGuide,
   updateHolderGuide,
@@ -122,7 +120,7 @@ import {
   stepLengthInput,
   toUnit,
 } from "./units";
-import { createWoodTexture } from "./woodTexture";
+import { createWoodTexture, getWoodSpeciesForModel } from "./woodTexture";
 import type { Id } from "../convex/_generated/dataModel";
 
 type CoreViewMode = "surface" | "fill" | "section";
@@ -995,9 +993,7 @@ function getExportFileName(model: ModelDefinition, params: ModelParams) {
     .map(
       (parameter) => {
         const value = getParam(params, parameter.key);
-        const formatted = model.viewer === "concentric-tube-jig-v1"
-          ? value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "")
-          : value.toFixed(1);
+        const formatted = value.toFixed(1);
         return `${parameter.key}-${formatted}`;
       },
     )
@@ -1266,13 +1262,6 @@ const HolderViewer = forwardRef<
         model,
       );
       updateDoorLockAdapterGuide(guideMesh, latestParamsRef.current);
-    } else if (model.viewer === "concentric-tube-jig-v1") {
-      mainMesh.geometry.dispose();
-      mainMesh.geometry = createConcentricTubeJigGeometry(
-        latestParamsRef.current,
-        model,
-      );
-      updateConcentricTubeJigGuide(guideMesh, latestParamsRef.current, model);
     } else if (model.viewer === "dining-table-v1") {
       if (!diningHardwareGroup || !diningMetalMaterial) return;
       mainMesh.geometry.dispose();
@@ -1947,8 +1936,7 @@ const HolderViewer = forwardRef<
       latestInteractionModeRef.current === "pan"
         ? THREE.TOUCH.PAN
         : THREE.TOUCH.ROTATE;
-    controls.minDistance =
-      model.viewer === "door-lock-adapter-v1" || model.viewer === "concentric-tube-jig-v1" ? 18 : 80;
+    controls.minDistance = model.viewer === "door-lock-adapter-v1" ? 18 : 80;
     controls.maxDistance = 1400;
     controlsRef.current = controls;
     const handleControlChange = () => updateCubeOrientation();
@@ -2071,15 +2059,11 @@ const HolderViewer = forwardRef<
         );
         mainBaseRef.current = normalizedMain.basePositions;
 
-        const woodTexture =
-          model.viewer === "dining-table-v1"
-            ? createWoodTexture(renderer, "oak")
-            : model.viewer === "hover-dining-table-v1"
-              ? createWoodTexture(renderer, "oak")
-              : null;
-        const isWoodFurniture =
-          model.viewer === "dining-table-v1" ||
-          model.viewer === "hover-dining-table-v1";
+        const woodSpecies = getWoodSpeciesForModel(model.id);
+        const woodTexture = woodSpecies
+          ? createWoodTexture(renderer, woodSpecies)
+          : null;
+        const isWoodFurniture = woodSpecies !== null;
         const mainMaterial = new THREE.MeshStandardMaterial({
           color:
             isWoodFurniture
@@ -2133,10 +2117,8 @@ const HolderViewer = forwardRef<
 
         const displayedGeometry = model.viewer === "door-lock-adapter-v1"
           ? createDoorLockAdapterGeometry(latestParamsRef.current, model)
-          : model.viewer === "concentric-tube-jig-v1"
-            ? createConcentricTubeJigGeometry(latestParamsRef.current, model)
-            : model.viewer === "dining-table-v1"
-              ? createDiningTableWoodGeometry(latestParamsRef.current, model)
+          : model.viewer === "dining-table-v1"
+            ? createDiningTableWoodGeometry(latestParamsRef.current, model)
             : model.viewer === "hover-dining-table-v1"
               ? createHoverDiningTableGeometry(latestParamsRef.current, model)
             : normalizedMain.geometry;
@@ -2251,7 +2233,6 @@ const HolderViewer = forwardRef<
 
         if (
           model.viewer === "door-lock-adapter-v1" ||
-          model.viewer === "concentric-tube-jig-v1" ||
           model.viewer === "dining-table-v1" ||
           model.viewer === "hover-dining-table-v1"
         ) {
@@ -5259,11 +5240,7 @@ export default function App({
         ...current,
         [key]: Number(
           nextValue.toFixed(
-            model.viewer === "concentric-tube-jig-v1"
-              ? 4
-              : CURVE_PARAM_KEYS.has(key)
-                ? 3
-                : 1,
+            CURVE_PARAM_KEYS.has(key) ? 3 : 1,
           ),
         ),
       };

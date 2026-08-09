@@ -1,8 +1,21 @@
 import * as THREE from "three";
 
+export type WoodSpecies = "oak" | "walnut";
+
+const WOOD_SPECIES_BY_MODEL: Readonly<Partial<Record<string, WoodSpecies>>> = {
+  "dining-table": "oak",
+  whisperer: "oak",
+  "hover-dining-table": "oak",
+  "wave-dining-table": "oak",
+};
+
+export function getWoodSpeciesForModel(modelId: string): WoodSpecies | null {
+  return WOOD_SPECIES_BY_MODEL[modelId] ?? null;
+}
+
 export function createWoodTexture(
   renderer: THREE.WebGLRenderer,
-  species: "oak" | "walnut",
+  species: WoodSpecies,
 ) {
   const canvas = document.createElement("canvas");
   canvas.width = 1024;

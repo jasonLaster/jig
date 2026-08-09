@@ -10,7 +10,6 @@ import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import {
   applyHolderMorph,
   applyTrayMorph,
-  createConcentricTubeJigGeometry,
   createDiningTableHardwareGeometries,
   createDiningTableWoodGeometry,
   createDoorLockAdapterGeometry,
@@ -23,6 +22,7 @@ import {
   getDefaultParams,
   type ModelDefinition,
 } from "../models";
+import { getWoodSpeciesForModel } from "../woodTexture";
 
 type ThemeMode = "light" | "dark";
 
@@ -55,7 +55,7 @@ function loadModelDefinition(configUrl: string) {
 }
 
 function materialColor(modelKey: string, theme: ThemeMode) {
-  if (modelKey.includes("dining-table")) {
+  if (getWoodSpeciesForModel(modelKey) === "oak") {
     return "#b9824f";
   }
   if (modelKey === "paper-towel-holder") {
@@ -93,10 +93,11 @@ function createPreviewObject(
 ) {
   const group = new THREE.Group();
   const params = getDefaultParams(definition);
+  const isWoodFurniture = getWoodSpeciesForModel(definition.id) !== null;
   const mainMaterial = new THREE.MeshStandardMaterial({
     color: materialColor(definition.id, theme),
-    metalness: definition.id.includes("dining-table") ? 0 : 0.08,
-    roughness: definition.id.includes("dining-table") ? 0.72 : 0.64,
+    metalness: isWoodFurniture ? 0 : 0.08,
+    roughness: isWoodFurniture ? 0.72 : 0.64,
     side: THREE.DoubleSide,
   });
   const metalMaterial = new THREE.MeshStandardMaterial({
@@ -161,14 +162,6 @@ function createPreviewObject(
     group.add(
       new THREE.Mesh(
         createDoorLockAdapterGeometry(params, definition),
-        mainMaterial,
-      ),
-    );
-  } else if (definition.viewer === "concentric-tube-jig-v1") {
-    sourceGeometry.dispose();
-    group.add(
-      new THREE.Mesh(
-        createConcentricTubeJigGeometry(params, definition),
         mainMaterial,
       ),
     );

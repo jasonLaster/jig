@@ -980,44 +980,6 @@ test.describe("3D print app", () => {
     });
   });
 
-  test("renders and exports the concentric tube jig with fractional-inch steps", async ({ page }) => {
-    await expectNoPageErrors(page, async () => {
-      await openReady(page, "/?model=concentric-tube-jig&unit=in");
-
-      await expect(page.getByRole("heading", { name: "Concentric Tube Jig" })).toBeVisible();
-      await expect(page.getByLabel("First outside diameter in inches")).toHaveValue("3/4");
-      await expect(page.getByLabel("Diameter increment in inches")).toHaveValue("1/16");
-      await expect(page.getByLabel("Height per tube in inches")).toHaveValue("1/4");
-      await expect(page.getByLabel("Center through-bore in inches")).toHaveValue("1/2");
-      await expect(page.getByText("9 tubes at 1/16 in steps")).toBeVisible();
-
-      const increment = page.getByLabel("Diameter increment in inches");
-      await increment.fill("1/8");
-      await increment.blur();
-      await expect(increment).toHaveValue("1/8");
-      await expect(page).toHaveURL(/increment=0\.125/);
-      await expectCanvasHasRenderedModel(page);
-
-      const [download] = await Promise.all([
-        page.waitForEvent("download"),
-        openActions(page).then(() =>
-          page.getByRole("button", { name: "Export", exact: true }).click(),
-        ),
-      ]);
-      expect(download.suggestedFilename()).toBe(
-        "concentric-tube-jig-firstDiameter-19.05-increment-3.175-tubeHeight-6.35-boreDiameter-12.7.stl",
-      );
-      const downloadPath = await download.path();
-      expect(downloadPath).not.toBeNull();
-      const topology = analyzeStlTopology(downloadPath!);
-      expect(topology.finiteCoordinates).toBe(true);
-      expect(topology.degenerateTriangles).toBe(0);
-      expect(topology.nonManifoldEdges).toBe(0);
-      expect(topology.size.x).toBeCloseTo(44.45, 1);
-      expect(topology.size.z).toBeCloseTo(57.15, 1);
-    });
-  });
-
   test("renders and exports a finite manifold simple box with editable dividers", async ({
     page,
   }) => {
