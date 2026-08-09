@@ -36,8 +36,8 @@ npm run build
 npx playwright test --workers=1
 ```
 
-The woodworking catalog was extracted from the `3d-prints` project at commit
-`024b42e89b665425bcd017e9039c88b956228df4`. Dormant non-woodworking engine
+The woodworking catalog is synchronized through `3d-prints` commit
+`9b3270611b43b8a4bb9197f04afaa424cbd65168`. Dormant non-woodworking engine
 code remains temporarily to keep this first extraction low-risk; it is not in
 the Jig catalog or audit surface.
 
