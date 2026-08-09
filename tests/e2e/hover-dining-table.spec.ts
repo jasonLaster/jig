@@ -215,6 +215,17 @@ test("builds The Wave with four top-frame corner triangles", () => {
   expect(fullSize.frameDepth).toBeCloseTo(4 * 25.4, 6);
   expect(fullSize.frameSideWidth).toBeCloseTo(2 * 25.4, 6);
   expect(fullSize.frameTopRailHeight).toBeCloseTo(2 * 25.4, 6);
+  expect(fullSize.frameCornerStyle).toBe("circular");
+  expect(fullSize.matchLengthwiseRailRoundover).toBe(true);
+  expect(fullSize.upperStretchers.edgeRadius).toBe(0);
+  expect(fullSize.upperStretchers.topEdgeRadius).toBeCloseTo(
+    fullSize.frameEdgeRoundover,
+    6,
+  );
+  expect(fullSize.upperStretchers.endRadius).toBeCloseTo(
+    fullSize.frameEdgeRoundover,
+    6,
+  );
   expect(fullSize.levelingFeet.enabled).toBe(true);
   expect(fullSize.cornerKneeBraces.enabled).toBe(true);
   expect(fullSize.cornerKneeBraces.count).toBe(4);
@@ -249,6 +260,27 @@ test("builds The Wave with four top-frame corner triangles", () => {
   expect(cutList.parts.find((part) => part.id === "B2")).toBeUndefined();
   expect(cutList.parts.find((part) => part.id === "L1")?.quantity).toBe(4);
   expect(cutList.parts.find((part) => part.id === "S1")?.quantity).toBe(2);
+  const lengthwiseRail = cutList.parts.find((part) => part.id === "S1")!;
+  expect(lengthwiseRail.fabricationProfile.support?.endRadius).toBeCloseTo(
+    fullSize.frameEdgeRoundover,
+    6,
+  );
+  expect(
+    lengthwiseRail.fabricationProfile.outline.filter(
+      (command) => command.kind === "arc",
+    ),
+  ).toHaveLength(4);
+  expect(lengthwiseRail.processDimensions).toContainEqual({
+    label: "End-face round-over",
+    value: fullSize.frameEdgeRoundover,
+  });
+  expect(lengthwiseRail.processDimensions).toContainEqual({
+    label: "Top edge round-over",
+    value: fullSize.frameEdgeRoundover,
+  });
+  expect(lengthwiseRail.processDimensions).not.toContainEqual(
+    expect.objectContaining({ label: "Bottom edge round-over" }),
+  );
   const kneeBrace = cutList.parts.find((part) => part.id === "K1")!;
   expect(kneeBrace.quantity).toBe(4);
   expect(kneeBrace.cutAngleDegrees).toBeCloseTo(45, 6);
@@ -262,8 +294,52 @@ test("builds The Wave with four top-frame corner triangles", () => {
   const leg = cutList.parts.find((part) => part.id === "B3")!;
   expect(topRail.name).toBe("Wave-curve top rail");
   expect(
-    topRail.fabricationProfile.outline.filter((command) => command.kind === "cubic"),
+    topRail.fabricationProfile.outline.filter((command) => command.kind === "arc"),
   ).toHaveLength(4);
+  expect(topRail.fabricationProfile.bezier).toBeUndefined();
+  expect(topRail.fabricationProfile.cornerRadii).toEqual({
+    outerRadius: fullSize.frameOuterTopCornerRadius,
+    innerRadius: fullSize.frameInnerTopCornerRadius,
+  });
+  const railOutline = topRail.fabricationProfile.outline;
+  railOutline.forEach((command, index) => {
+    if (command.kind !== "arc") return;
+    const previous = railOutline[index - 1];
+    if (!previous || previous.kind === "close") {
+      throw new Error("Circular rail return must follow an explicit profile point");
+    }
+    expect(
+      Math.hypot(
+        previous.to.x - command.center.x,
+        previous.to.y - command.center.y,
+      ),
+    ).toBeCloseTo(command.radius, 6);
+    expect(
+      Math.hypot(
+        command.to.x - command.center.x,
+        command.to.y - command.center.y,
+      ),
+    ).toBeCloseTo(command.radius, 6);
+  });
+  const { fullSize: independentlyRounded } = getHoverDiningTableSpec({
+    ...waveDefaultParams,
+    matchLengthwiseRailRoundover: 0,
+    topSupportEdgeRadius: 0.25 * 25.4,
+  });
+  expect(independentlyRounded.matchLengthwiseRailRoundover).toBe(false);
+  expect(independentlyRounded.upperStretchers.edgeRadius).toBe(0);
+  expect(independentlyRounded.upperStretchers.topEdgeRadius).toBeCloseTo(
+    0.25 * 25.4,
+    6,
+  );
+  expect(independentlyRounded.upperStretchers.endRadius).toBeCloseTo(
+    0.25 * 25.4,
+    6,
+  );
+  expect(independentlyRounded.frameEdgeRoundover).toBeCloseTo(
+    fullSize.frameEdgeRoundover,
+    6,
+  );
   expect(leg.name).toBe("Full-height leg");
   expect(leg.quantity).toBe(4);
   expect(leg.fabricationProfile.bounds.minY).toBeCloseTo(0, 6);
@@ -304,6 +380,16 @@ test("builds The Wave with four top-frame corner triangles", () => {
   expect(
     exploded.filter((part) => part.category === "leveling-foot"),
   ).toHaveLength(4);
+  const explodedLengthwiseRails = exploded.filter(
+    (part) => part.category === "upper-stretcher",
+  );
+  expect(explodedLengthwiseRails).toHaveLength(2);
+  for (const part of explodedLengthwiseRails) {
+    const railGeometry = inspectGeometry(part.geometry);
+    expect(railGeometry.finite).toBe(true);
+    expect(railGeometry.degenerateTriangles).toBe(0);
+    expect(uniqueAxisCoordinates(part.geometry, "x")).toBeGreaterThan(2);
+  }
   exploded.forEach((part) => part.geometry.dispose());
 
   const withoutCornerBraces = getHoverDiningTableStructuralAssessment({
@@ -2133,6 +2219,12 @@ test("renders The Wave across assembly and fabrication views", async ({
   await expect(page.getByLabel("End-box outer bottom radius in inches")).toHaveCount(0);
   await expect(page.getByLabel("End-box inner bottom radius in inches")).toHaveCount(0);
   await expect(page.getByLabel("End-box outer top radius in inches")).toBeVisible();
+  await expect(
+    page.getByLabel("Outer corner rail-side sweep Bézier tension"),
+  ).toHaveCount(0);
+  await expect(
+    page.getByLabel("Inner corner stile-side sweep Bézier tension"),
+  ).toHaveCount(0);
   await expect(page.getByLabel("Use adjustable leveling feet")).toBeChecked();
   await expect(page.getByLabel("Top support style")).toContainText("Original stretchers");
   await expect(page.getByLabel("Bottom support style")).toContainText("None");
@@ -2145,6 +2237,28 @@ test("renders The Wave across assembly and fabrication views", async ({
   await expect(
     page.getByRole("heading", { name: "Bottom support members" }),
   ).toHaveCount(0);
+  const topSupportGroup = page
+    .locator(".parameter-group")
+    .filter({ has: page.getByRole("heading", { name: "Top support members" }) });
+  await topSupportGroup.locator(".parameter-group-toggle").click();
+  const matchRailRoundover = page.getByLabel("Match the leg round-over");
+  await expect(matchRailRoundover).toBeChecked();
+  await expect(
+    page.getByLabel("Lengthwise rail top/end round-over in inches"),
+  ).toHaveCount(0);
+  await page.getByLabel("End-box face-edge round-over in inches").fill("1/4");
+  await expect(
+    page.getByText(/1\/4 in top-edge \+ end-face round-over matching legs/),
+  ).toBeVisible();
+  await matchRailRoundover.evaluate((input: HTMLInputElement) => input.click());
+  await expect(matchRailRoundover).not.toBeChecked();
+  const railRoundover = page.getByLabel(
+    "Lengthwise rail top/end round-over in inches",
+  );
+  await expect(railRoundover).toBeVisible();
+  await railRoundover.fill("1/8");
+  await expect(page).toHaveURL(/matchLengthwiseRailRoundover=0/);
+  await expect(page).toHaveURL(/topSupportEdgeRadius=0\.126/);
   const cornerBraceGroup = page
     .locator(".parameter-group")
     .filter({ has: page.getByRole("heading", { name: "Corner braces" }) });
@@ -2159,6 +2273,10 @@ test("renders The Wave across assembly and fabrication views", async ({
   await expect(page).toHaveURL(/endFrameStyle=1(?:&|$)/);
   await page.reload();
   await expect(page.getByLabel("Use open leg frames")).toBeChecked();
+  await expect(page.getByLabel("Match the leg round-over")).not.toBeChecked();
+  await expect(
+    page.getByLabel("Lengthwise rail top/end round-over in inches"),
+  ).toHaveValue("1/8");
   await expect(page.getByText(/2 open frames · 4 full-height legs/)).toBeVisible();
 
   await page.getByRole("button", { name: "Exploded" }).click();
@@ -2179,6 +2297,15 @@ test("renders The Wave across assembly and fabrication views", async ({
   await expect(page.locator('.hover-cut-card[data-part-id="B2"]')).toHaveCount(0);
   await expect(page.locator('.hover-cut-card[data-part-id="B3"]')).toContainText(
     "Full-height leg",
+  );
+  await expect(page.locator('.hover-cut-card[data-part-id="S1"]')).toContainText(
+    "rounded-end member profile",
+  );
+  await expect(page.locator('.hover-cut-card[data-part-id="S1"]')).toContainText(
+    "End perimeter R 1/8 in",
+  );
+  await expect(page.locator('.hover-cut-card[data-part-id="S1"]')).toContainText(
+    "Top R 1/8 in",
   );
   await expect(page.locator('.hover-cut-card[data-part-id="K1"]')).toContainText(
     "Top-frame diagonal knee brace",

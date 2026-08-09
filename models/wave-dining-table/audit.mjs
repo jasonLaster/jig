@@ -38,6 +38,28 @@ close(params.frameDepth, 4 * inch, "leg-frame depth");
 close(params.frameSideWidth, 2 * inch, "leg width");
 close(params.frameTopRailHeight, 2 * inch, "wave top-rail height");
 close(params.cornerBraceReach, 10 * inch, "corner-brace reach");
+assert.equal(
+  params.matchLengthwiseRailRoundover,
+  1,
+  "lengthwise rails must match the leg round-over by default",
+);
+close(
+  params.topSupportEdgeRadius,
+  params.frameEdgeRoundover,
+  "default rail/leg round-over parity",
+);
+for (const removedBezierControl of [
+  "frameOuterRailCurveTension",
+  "frameOuterStileCurveTension",
+  "frameInnerRailCurveTension",
+  "frameInnerStileCurveTension",
+]) {
+  assert.equal(
+    removedBezierControl in params,
+    false,
+    `${removedBezierControl} must not remain in The Wave controls`,
+  );
+}
 
 const topBottom = params.overallHeight - params.topThickness;
 const frameTopWidth = params.tableWidth - 2 * params.sideOverhang;
@@ -67,7 +89,9 @@ for (const required of [
   "createCornerKneeBraceParts",
   'id: "K1"',
   "cornerBraceCount",
-  "one or two square rail-tangent seams",
+  "consistent corner returns and two square tangent seams",
+  "getCircularRoundedTrapezoidDefinition",
+  "Matched lengthwise rail top edges and ends must use the leg face-edge round-over",
 ]) {
   assert.ok(source.includes(required), `shared source is missing ${required}`);
 }
@@ -87,6 +111,8 @@ const auditText = [
 for (const phrase of [
   "two open transverse frames",
   "distinctive wave-shaped shoulder",
+  "true circular fillets",
+  "Match the lengthwise rails' tabletop-facing top edges and end-face perimeters",
   "two parallel lengthwise upper rails",
   "four plan-view corner knee braces",
   "no floor connector",

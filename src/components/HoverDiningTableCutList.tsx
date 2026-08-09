@@ -24,13 +24,27 @@ function formatProcessing(part: HoverDiningTableCutPart) {
     return "flush underside mortise · U-channel web + flanges";
   }
   if (part.kind === "rail") {
-    return "finished inner/outer Bézier corners · rounded face edges";
+    return part.fabricationProfile.cornerRadii
+      ? "finished inner/outer circular radii · rounded face edges"
+      : "finished inner/outer Bézier corners · rounded face edges";
   }
   if (part.kind === "stile") {
     return `${formatAngle(part.cutAngleDegrees)} tangent-seam profile · rounded face edges`;
   }
   if (part.kind === "support") {
-    return "square box-parallel ends · rounded bottom long edges";
+    const endRadius = part.fabricationProfile.support?.endRadius ?? 0;
+    const bottomRadius = part.fabricationProfile.section.radius;
+    const topRadius = part.fabricationProfile.section.topRadius ?? 0;
+    const longEdges = topRadius > 0 && bottomRadius > 0
+      ? "rounded top + bottom long edges"
+      : topRadius > 0
+        ? "rounded tabletop-facing top edges"
+        : bottomRadius > 0
+          ? "rounded bottom long edges"
+          : "square long edges";
+    return endRadius > 0
+      ? `rounded end-face perimeters · flat bearing centers · ${longEdges}`
+      : `square box-parallel ends · ${longEdges}`;
   }
   return "finished profile";
 }
@@ -130,6 +144,12 @@ function layoutProfile(
       const to = map(command.to);
       return `C ${control1.x} ${control1.y} ${control2.x} ${control2.y} ${to.x} ${to.y}`;
     }
+    if (command.kind === "arc") {
+      const to = map(command.to);
+      const renderedRadius = command.radius * scale;
+      const sweep = command.clockwise ? 0 : 1;
+      return `A ${renderedRadius} ${renderedRadius} 0 0 ${sweep} ${to.x} ${to.y}`;
+    }
     const to = map(command.to);
     return `${command.kind === "move" ? "M" : "L"} ${to.x} ${to.y}`;
   }).join(" ");
@@ -213,11 +233,17 @@ function PartSection({
         </>
       ) : null}
       <line x1={section.left} x2={section.left - 10} y1={section.top} y2={section.top - 9} />
-      {part.kind !== "channel" ? (
+      {part.kind !== "channel" && sectionRadiusIsVisible(part) ? (
         <text x="318" y="105">
-          Bottom R {formatLength(part.fabricationProfile.section.radius, unit)}
+          {part.fabricationProfile.section.radius > 0
+            ? `Bottom R ${formatLength(part.fabricationProfile.section.radius, unit)}`
+            : ""}
+          {part.fabricationProfile.section.radius > 0 &&
+          (part.fabricationProfile.section.topRadius ?? 0) > 0
+            ? " · "
+            : ""}
           {(part.fabricationProfile.section.topRadius ?? 0) > 0
-            ? ` · Top R ${formatLength(part.fabricationProfile.section.topRadius!, unit)}`
+            ? `Top R ${formatLength(part.fabricationProfile.section.topRadius!, unit)}`
             : ""}
         </text>
       ) : null}
@@ -233,19 +259,32 @@ function ProfileFeatureLabels({
   part: HoverDiningTableCutPart;
   unit: LengthUnit;
 }) {
+  const supportEndRadius = part.fabricationProfile.support?.endRadius ?? 0;
+  if (supportEndRadius > 0) {
+    return (
+      <g className="cut-part-feature-labels">
+        <text x="45" y="29">
+          End perimeter R {formatLength(supportEndRadius, unit)} · flat bearing center
+        </text>
+      </g>
+    );
+  }
   const bezier = part.fabricationProfile.bezier;
-  if (!bezier) return null;
+  const radii = part.fabricationProfile.cornerRadii;
+  if (!bezier && !radii) return null;
   return (
     <g className="cut-part-feature-labels">
       <text x="45" y="29">
-        Outer R {formatLength(bezier.outerRadius, unit)} · κ rail{" "}
-        {bezier.outerRailTension.toFixed(3)} / stile{" "}
-        {bezier.outerStileTension.toFixed(3)}
+        Outer R {formatLength((radii ?? bezier!).outerRadius, unit)}
+        {bezier
+          ? ` · κ rail ${bezier.outerRailTension.toFixed(3)} / stile ${bezier.outerStileTension.toFixed(3)}`
+          : " · circular"}
       </text>
       <text x="45" y="124">
-        Inner R {formatLength(bezier.innerRadius, unit)} · κ rail{" "}
-        {bezier.innerRailTension.toFixed(3)} / stile{" "}
-        {bezier.innerStileTension.toFixed(3)}
+        Inner R {formatLength((radii ?? bezier!).innerRadius, unit)}
+        {bezier
+          ? ` · κ rail ${bezier.innerRailTension.toFixed(3)} / stile ${bezier.innerStileTension.toFixed(3)}`
+          : " · circular"}
       </text>
     </g>
   );
@@ -303,8 +342,12 @@ function sectionRadiusIsVisible(part: HoverDiningTableCutPart) {
   );
 }
 
-function shouldShowBezierLabels(part: HoverDiningTableCutPart) {
-  return Boolean(part.fabricationProfile.bezier);
+function shouldShowProfileFeatureLabels(part: HoverDiningTableCutPart) {
+  return Boolean(
+    part.fabricationProfile.bezier ||
+      part.fabricationProfile.cornerRadii ||
+      (part.fabricationProfile.support?.endRadius ?? 0) > 0,
+  );
 }
 
 function shouldShowLap(part: HoverDiningTableCutPart) {
@@ -324,7 +367,9 @@ function profileLabel(part: HoverDiningTableCutPart) {
     case "brace":
       return "mitered plan profile";
     case "support":
-      return "square-ended member profile";
+      return (part.fabricationProfile.support?.endRadius ?? 0) > 0
+        ? "rounded-end member profile"
+        : "square-ended member profile";
     case "channel":
       return "widthwise steel C-channel";
     case "leveling-foot":
@@ -414,7 +459,7 @@ function HoverCutPartDiagram({
         </defs>
 
         <PartOutline layout={layout} part={part} />
-        {shouldShowBezierLabels(part) ? (
+        {shouldShowProfileFeatureLabels(part) ? (
           <ProfileFeatureLabels part={part} unit={unit} />
         ) : null}
         {shouldShowLap(part) ? (
@@ -484,7 +529,11 @@ function HoverCutPartDiagram({
         </div>
         <div>
           <dt>End cut</dt>
-          <dd>{formatAngle(part.cutAngleDegrees)}</dd>
+          <dd>
+            {(part.fabricationProfile.support?.endRadius ?? 0) > 0
+              ? `square core · perimeter R ${formatLength(part.fabricationProfile.support!.endRadius, unit)}`
+              : formatAngle(part.cutAngleDegrees)}
+          </dd>
         </div>
         {part.lap ? (
           <>
@@ -626,14 +675,18 @@ export function HoverDiningTableCutList({
           ) : (
             <p>
               Straight-support lengths run between the two parallel end-frame
-              contact planes; their square ends are ready for the selected joinery.
+              contact planes. Rounded lengthwise-rail ends retain flat central
+              bearing faces; other straight supports keep square ends.
             </p>
           )}
           <p>
             Grain runs with every listed oak length; H1 is blackened steel and
             has no grain direction. The end-box curves are routed
             from the same constrained profiles used by the assembled and
-            exploded models: B1/B2 carry the inner and outer Bézier returns,
+            exploded models: B1/B2 carry the inner and outer
+            {cutList.parts.some((part) => part.fabricationProfile.cornerRadii)
+              ? " circular-radius returns"
+              : " Bézier returns"},
             while B3 runs between their tangent seams. Section views preserve
             every listed edge treatment.
           </p>

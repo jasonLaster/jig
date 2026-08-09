@@ -4,7 +4,9 @@
 
 The Wave keeps the 75 × 35.5 × 29.5 in Hover-table envelope, profiled oak top, three recessed widthwise C-channels, and two lengthwise upper rails. It replaces each closed transverse end box with an open frame made from one sculpted top rail and two full-height legs. Four mirrored knee braces join the inside faces of those lengthwise rails to the transverse top rails, closing a plan-view triangle at every corner.
 
-The top rail owns both the outer and inner cubic Bézier returns. Those returns meet each leg at square tangent seams, creating the recognizable wave-shaped shoulder while keeping the leg blank straight-grained and independently fabricable. The opening continues to the floor; there is no hidden bottom rail.
+The top rail owns both the outer and inner constant-radius circular fillets. Each radius stays tangent to the horizontal rail and its adjoining leg, creating the recognizable wave-shaped shoulder without separate curve-tension controls. The fillets meet each leg at square tangent seams, keeping the leg blank straight-grained and independently fabricable. The opening continues to the floor; there is no hidden bottom rail.
+
+The two lengthwise rails use the same 3/8 in round-over as the legs by default, along both tabletop-facing top long edges and around each end-face perimeter. At each leg-frame junction, the top-edge and end-face radii blend into one another so the rail's two upper curves descend into the matching face-edge curve on the transverse frame. The end treatment retains a flat central bearing face against that frame rather than turning the structural joint into a fully pill-shaped end. A URL-backed “Match the leg round-over” control keeps those radii coupled; turning it off reveals the independent lengthwise-rail top/end round-over.
 
 ## Default assembly
 

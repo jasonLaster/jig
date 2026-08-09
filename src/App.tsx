@@ -341,6 +341,7 @@ const PARAM_QUERY_KEYS = [
   "topSupportThickness",
   "topSupportEndpointInset",
   "topSupportEdgeRadius",
+  "matchLengthwiseRailRoundover",
   "bottomSupportWidth",
   "bottomSupportThickness",
   "bottomSupportEndpointInset",
@@ -400,6 +401,7 @@ const SCALAR_PARAM_KEYS = new Set([
   "bottomSupportStyle",
   "syncCrossbarDimensions",
   "levelingFeetEnabled",
+  "matchLengthwiseRailRoundover",
 ]);
 const CURVE_PARAM_KEYS = new Set([
   "topEdgeTension",
@@ -414,6 +416,7 @@ const OPTION_PARAM_KEYS = new Set([
   "endFrameStyle",
   "syncCrossbarDimensions",
   "levelingFeetEnabled",
+  "matchLengthwiseRailRoundover",
 ]);
 const LEG_GROOVE_PARAM_KEYS = new Set([
   "legGrooveHeight",
@@ -3117,7 +3120,9 @@ function HoverDiningTableParameterControls({
                 </p>
               ) : group === "Top support members" ? (
                 <p className="parameter-group-description">
-                  Dimensions for the selected top X or stretcher members.
+                  {floorMustRemainOpen
+                    ? "Dimensions for the two lengthwise rails. Their tabletop-facing top edges and end-face perimeters match the leg round-over by default."
+                    : "Dimensions for the selected top X or stretcher members."}
                 </p>
               ) : group === "Corner braces" ? (
                 <p className="parameter-group-description">
@@ -3201,6 +3206,25 @@ function HoverDiningTableParameterControls({
                       }
                     />
                   );
+                }
+                if (parameter.key === "matchLengthwiseRailRoundover") {
+                  return (
+                    <OriginalOverlayToggle
+                      checked={getParam(params, parameter.key) >= 0.5}
+                      key={parameter.key}
+                      label={parameter.label}
+                      onChange={(checked) =>
+                        onChange(parameter.key, checked ? 1 : 0)
+                      }
+                    />
+                  );
+                }
+                if (
+                  parameter.key === "topSupportEdgeRadius" &&
+                  floorMustRemainOpen &&
+                  getParam(params, "matchLengthwiseRailRoundover") >= 0.5
+                ) {
+                  return null;
                 }
                 if (CURVE_PARAM_KEYS.has(parameter.key)) {
                   return (

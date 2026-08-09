@@ -152,6 +152,20 @@ function sampleProfilePath(
         curveSegments,
       );
       current = end;
+    } else if (command.kind === "arc") {
+      let sweep = command.endAngle - command.startAngle;
+      if (command.clockwise && sweep > 0) sweep -= Math.PI * 2;
+      if (!command.clockwise && sweep < 0) sweep += Math.PI * 2;
+      for (let index = 1; index <= curveSegments; index += 1) {
+        const angle = command.startAngle + sweep * (index / curveSegments);
+        points.push(
+          new THREE.Vector2(
+            command.center.x + Math.cos(angle) * command.radius,
+            command.center.y + Math.sin(angle) * command.radius,
+          ),
+        );
+      }
+      current = vectorFromProfilePoint(command.to);
     } else {
       throw new Error("Routing-template path contains an unexpected command");
     }
@@ -171,7 +185,9 @@ function boundaryFromFabricationProfile(
   const seamIndex = outline.findIndex(
     (command, index) =>
       index > 0 &&
-      (command.kind === "line" || command.kind === "cubic") &&
+      (command.kind === "line" ||
+        command.kind === "cubic" ||
+        command.kind === "arc") &&
       command.edgeTreatment === "square",
   );
   if (

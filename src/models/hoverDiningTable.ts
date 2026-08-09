@@ -46,6 +46,7 @@ type StraightSupportSpec = {
   endpointInset: number;
   edgeRadius: number;
   topEdgeRadius: number;
+  endRadius: number;
   spanX: number;
   centerYs: number[];
   placementBoundaryY?: number;
@@ -117,6 +118,16 @@ export type HoverDiningTableProfileCommand =
       to: HoverDiningTableProfilePoint;
       edgeTreatment?: "roundover" | "square";
     }
+  | {
+      kind: "arc";
+      center: HoverDiningTableProfilePoint;
+      radius: number;
+      startAngle: number;
+      endAngle: number;
+      clockwise: boolean;
+      to: HoverDiningTableProfilePoint;
+      edgeTreatment?: "roundover" | "square";
+    }
   | { kind: "close"; edgeTreatment?: "roundover" | "square" };
 
 export type HoverDiningTableFabricationProfile = {
@@ -152,6 +163,13 @@ export type HoverDiningTableFabricationProfile = {
     innerRailTension: number;
     innerStileTension: number;
   };
+  cornerRadii?: {
+    outerRadius: number;
+    innerRadius: number;
+  };
+  support?: {
+    endRadius: number;
+  };
   tabletop?: {
     planCornerRadius: number;
     endFaceRoundover: number;
@@ -182,11 +200,13 @@ export type HoverDiningTableSpec = {
   frameOuterBottomCornerRadius: number;
   frameInnerTopCornerRadius: number;
   frameInnerBottomCornerRadius: number;
+  frameCornerStyle: "bezier" | "circular";
   frameOuterRailCurveTension: number;
   frameOuterStileCurveTension: number;
   frameInnerRailCurveTension: number;
   frameInnerStileCurveTension: number;
   frameEdgeRoundover: number;
+  matchLengthwiseRailRoundover: boolean;
   halfLapClearance: number;
   frameHeight: number;
   frameTopWidth: number;
@@ -351,7 +371,10 @@ function rawHoverDiningTableSpec(params: ModelParams): HoverDiningTableSpec {
   const topSupportWidth = getParam(params, "topSupportWidth");
   const topSupportThickness = getParam(params, "topSupportThickness");
   const topSupportEndpointInset = getParam(params, "topSupportEndpointInset");
-  const topSupportEdgeRadius = getParam(params, "topSupportEdgeRadius");
+  const requestedTopSupportEdgeRadius = getParam(
+    params,
+    "topSupportEdgeRadius",
+  );
   const bottomSupportWidth = getParam(params, "bottomSupportWidth");
   const bottomSupportThickness = getParam(params, "bottomSupportThickness");
   const bottomSupportEndpointInset = getParam(
@@ -391,6 +414,32 @@ function rawHoverDiningTableSpec(params: ModelParams): HoverDiningTableSpec {
       2 -
       MIN_FRAME_FACE_FLAT / 2,
   );
+  const matchLengthwiseRailRoundover =
+    Number.isFinite(params.matchLengthwiseRailRoundover) &&
+    params.matchLengthwiseRailRoundover >= 0.5;
+  const topSupportEdgeRadius = matchLengthwiseRailRoundover
+    ? frameEdgeRoundover
+    : requestedTopSupportEdgeRadius;
+  const hasLengthwiseRailRoundoverControls = Number.isFinite(
+    params.matchLengthwiseRailRoundover,
+  );
+  const lengthwiseRailBottomRadius = hasLengthwiseRailRoundoverControls
+    ? 0
+    : topSupportEdgeRadius;
+  const lengthwiseRailTopRadius = hasLengthwiseRailRoundoverControls
+    ? topSupportEdgeRadius
+    : 0;
+  const lengthwiseRailEndRadius = hasLengthwiseRailRoundoverControls
+    ? topSupportEdgeRadius
+    : 0;
+  const hasBezierFrameControls = [
+    params.frameOuterRailCurveTension,
+    params.frameOuterStileCurveTension,
+    params.frameInnerRailCurveTension,
+    params.frameInnerStileCurveTension,
+  ].every(Number.isFinite);
+  const frameCurveTension = (key: string) =>
+    Number.isFinite(params[key]) ? params[key] : 0.5522847498;
   const endOverhang = getParam(params, "endOverhang");
   const braceSpanX = length - 2 * (endOverhang + frameDepth);
   const channelWidth = getParam(params, "channelWidth");
@@ -456,23 +505,21 @@ function rawHoverDiningTableSpec(params: ModelParams): HoverDiningTableSpec {
     ),
     frameInnerTopCornerRadius,
     frameInnerBottomCornerRadius,
-    frameOuterRailCurveTension: getParam(
-      params,
+    frameCornerStyle: hasBezierFrameControls ? "bezier" : "circular",
+    frameOuterRailCurveTension: frameCurveTension(
       "frameOuterRailCurveTension",
     ),
-    frameOuterStileCurveTension: getParam(
-      params,
+    frameOuterStileCurveTension: frameCurveTension(
       "frameOuterStileCurveTension",
     ),
-    frameInnerRailCurveTension: getParam(
-      params,
+    frameInnerRailCurveTension: frameCurveTension(
       "frameInnerRailCurveTension",
     ),
-    frameInnerStileCurveTension: getParam(
-      params,
+    frameInnerStileCurveTension: frameCurveTension(
       "frameInnerStileCurveTension",
     ),
     frameEdgeRoundover,
+    matchLengthwiseRailRoundover,
     halfLapClearance: getParam(params, "halfLapClearance"),
     frameHeight,
     frameTopWidth,
@@ -515,8 +562,9 @@ function rawHoverDiningTableSpec(params: ModelParams): HoverDiningTableSpec {
       width: topSupportWidth,
       thickness: topSupportThickness,
       endpointInset: topSupportEndpointInset,
-      edgeRadius: topSupportEdgeRadius,
-      topEdgeRadius: 0,
+      edgeRadius: lengthwiseRailBottomRadius,
+      topEdgeRadius: lengthwiseRailTopRadius,
+      endRadius: lengthwiseRailEndRadius,
       spanX: braceSpanX,
       centerYs: [-upperStretcherCenterY, upperStretcherCenterY],
       placementBoundaryY: upperPlacementBoundaryY,
@@ -545,6 +593,7 @@ function rawHoverDiningTableSpec(params: ModelParams): HoverDiningTableSpec {
       endpointInset: bottomSupportEndpointInset,
       edgeRadius: bottomSupportEdgeRadius,
       topEdgeRadius: bottomSupportTopEdgeRadius,
+      endRadius: 0,
       spanX: braceSpanX,
       centerYs: [0],
       zBottom: levelingFootExtension,
@@ -671,12 +720,13 @@ function assertStraightSupport(
   for (const [dimensionLabel, value] of [
     [`${label} width`, support.width],
     [`${label} thickness`, support.thickness],
-    [`${label} edge radius`, support.edgeRadius],
     [`${label} longitudinal span`, support.spanX],
   ] as const) {
     assertPositive(value, dimensionLabel);
   }
+  assertNonNegative(support.edgeRadius, `${label} bottom edge radius`);
   assertNonNegative(support.topEdgeRadius, `${label} top edge radius`);
+  assertNonNegative(support.endRadius, `${label} end-face edge radius`);
   assertNonNegative(support.endpointInset, `${label} endpoint inset`);
   if (support.centerYs.length !== support.count) {
     throw new Error(`${label} must retain its declared piece count`);
@@ -687,10 +737,15 @@ function assertStraightSupport(
   if (
     support.edgeRadius * 2 >= support.width ||
     support.topEdgeRadius * 2 >= support.width ||
+    support.endRadius * 2 >= support.width ||
     support.edgeRadius * 2 >= support.thickness ||
+    support.endRadius * 2 >= support.thickness ||
     support.edgeRadius + support.topEdgeRadius >= support.thickness
   ) {
     throw new Error(`${label} edge radius must preserve a flat cross-section`);
+  }
+  if (support.endRadius * 2 >= support.spanX) {
+    throw new Error(`${label} end radius must preserve a flat longitudinal run`);
   }
   const placementBoundaryY = support.placementBoundaryY;
   if (
@@ -981,16 +1036,32 @@ export function assertHoverDiningTableSpec(spec: HoverDiningTableSpec) {
       throw new Error(`${label} brace round-over must leave square half-lap shoulders`);
     }
   }
-  for (const [label, tension] of [
+  const tensions: readonly (readonly [string, number])[] = [
     ["tabletop edge", spec.topEdgeTension],
-    ["outer frame rail-side handle", spec.frameOuterRailCurveTension],
-    ["outer frame stile-side handle", spec.frameOuterStileCurveTension],
-    ["inner frame rail-side handle", spec.frameInnerRailCurveTension],
-    ["inner frame stile-side handle", spec.frameInnerStileCurveTension],
-  ] as const) {
+    ...(spec.frameCornerStyle === "bezier"
+      ? [
+          ["outer frame rail-side handle", spec.frameOuterRailCurveTension],
+          ["outer frame stile-side handle", spec.frameOuterStileCurveTension],
+          ["inner frame rail-side handle", spec.frameInnerRailCurveTension],
+          ["inner frame stile-side handle", spec.frameInnerStileCurveTension],
+        ] as const
+      : []),
+  ];
+  for (const [label, tension] of tensions) {
     if (tension < 0.3 || tension > 0.9) {
       throw new Error(`${label} Bézier tension must stay between 0.3 and 0.9`);
     }
+  }
+  if (
+    spec.matchLengthwiseRailRoundover &&
+    (Math.abs(spec.upperStretchers.topEdgeRadius - spec.frameEdgeRoundover) >
+        EPSILON ||
+      Math.abs(spec.upperStretchers.endRadius - spec.frameEdgeRoundover) >
+        EPSILON)
+  ) {
+    throw new Error(
+      "Matched lengthwise rail top edges and ends must use the leg face-edge round-over",
+    );
   }
 }
 
@@ -1026,6 +1097,7 @@ function scaleStraightSupport(
     endpointInset: support.endpointInset / scale,
     edgeRadius: support.edgeRadius / scale,
     topEdgeRadius: support.topEdgeRadius / scale,
+    endRadius: support.endRadius / scale,
     spanX: support.spanX / scale,
     centerYs: support.centerYs.map((centerY) => centerY / scale),
     placementBoundaryY:
@@ -1157,6 +1229,16 @@ type CubicProfileSegment = {
   to: THREE.Vector2;
 };
 
+type ArcProfileSegment = {
+  from: THREE.Vector2;
+  center: THREE.Vector2;
+  radius: number;
+  startAngle: number;
+  endAngle: number;
+  clockwise: boolean;
+  to: THREE.Vector2;
+};
+
 type RoundedTrapezoidDefinition = {
   bottomLeftStart: THREE.Vector2;
   bottomRightStart: THREE.Vector2;
@@ -1171,6 +1253,102 @@ type RoundedTrapezoidDefinition = {
   topLeftCurve: CubicProfileSegment;
   bottomLeftCurve: CubicProfileSegment;
 };
+
+type CircularRoundedTrapezoidDefinition = Omit<
+  RoundedTrapezoidDefinition,
+  | "bottomRightCurve"
+  | "topRightCurve"
+  | "topLeftCurve"
+  | "bottomLeftCurve"
+> & {
+  bottomRightCurve: ArcProfileSegment;
+  topRightCurve: ArcProfileSegment;
+  topLeftCurve: ArcProfileSegment;
+  bottomLeftCurve: ArcProfileSegment;
+};
+
+function circularFillet(
+  previous: THREE.Vector2,
+  corner: THREE.Vector2,
+  next: THREE.Vector2,
+  radius: number,
+): ArcProfileSegment {
+  const towardPrevious = previous.clone().sub(corner).normalize();
+  const towardNext = next.clone().sub(corner).normalize();
+  const angle = Math.acos(
+    THREE.MathUtils.clamp(towardPrevious.dot(towardNext), -1, 1),
+  );
+  const tangentDistance = radius / Math.tan(angle / 2);
+  const from = corner.clone().addScaledVector(towardPrevious, tangentDistance);
+  const to = corner.clone().addScaledVector(towardNext, tangentDistance);
+  const center = corner
+    .clone()
+    .addScaledVector(
+      towardPrevious.clone().add(towardNext).normalize(),
+      radius / Math.sin(angle / 2),
+    );
+  return {
+    from,
+    center,
+    radius,
+    startAngle: Math.atan2(from.y - center.y, from.x - center.x),
+    endAngle: Math.atan2(to.y - center.y, to.x - center.x),
+    clockwise: false,
+    to,
+  };
+}
+
+function getCircularRoundedTrapezoidDefinition(
+  bottomWidth: number,
+  topWidth: number,
+  bottom: number,
+  top: number,
+  bottomRadius: number,
+  topRadius: number,
+): CircularRoundedTrapezoidDefinition {
+  const bottomLeft = new THREE.Vector2(-bottomWidth / 2, bottom);
+  const bottomRight = new THREE.Vector2(bottomWidth / 2, bottom);
+  const topRight = new THREE.Vector2(topWidth / 2, top);
+  const topLeft = new THREE.Vector2(-topWidth / 2, top);
+  const bottomRightCurve = circularFillet(
+    bottomLeft,
+    bottomRight,
+    topRight,
+    bottomRadius,
+  );
+  const topRightCurve = circularFillet(
+    bottomRight,
+    topRight,
+    topLeft,
+    topRadius,
+  );
+  const topLeftCurve = circularFillet(
+    topRight,
+    topLeft,
+    bottomLeft,
+    topRadius,
+  );
+  const bottomLeftCurve = circularFillet(
+    topLeft,
+    bottomLeft,
+    bottomRight,
+    bottomRadius,
+  );
+  return {
+    bottomLeftStart: bottomLeftCurve.to,
+    bottomRightStart: bottomRightCurve.from,
+    rightLower: bottomRightCurve.to,
+    rightUpper: topRightCurve.from,
+    topRightEnd: topRightCurve.to,
+    topLeftStart: topLeftCurve.from,
+    leftUpper: topLeftCurve.to,
+    leftLower: bottomLeftCurve.from,
+    bottomRightCurve,
+    topRightCurve,
+    topLeftCurve,
+    bottomLeftCurve,
+  };
+}
 
 function getRoundedTrapezoidDefinition(
   bottomWidth: number,
@@ -1352,6 +1530,40 @@ function cubicProfile(
       };
 }
 
+function arcProfile(
+  curve: ArcProfileSegment,
+  reverse = false,
+): HoverDiningTableProfileCommand {
+  return reverse
+    ? {
+        kind: "arc",
+        center: profilePoint(curve.center),
+        radius: curve.radius,
+        startAngle: curve.endAngle,
+        endAngle: curve.startAngle,
+        clockwise: !curve.clockwise,
+        to: profilePoint(curve.from),
+      }
+    : {
+        kind: "arc",
+        center: profilePoint(curve.center),
+        radius: curve.radius,
+        startAngle: curve.startAngle,
+        endAngle: curve.endAngle,
+        clockwise: curve.clockwise,
+        to: profilePoint(curve.to),
+      };
+}
+
+function curvedProfile(
+  curve: CubicProfileSegment | ArcProfileSegment,
+  reverse = false,
+) {
+  return "center" in curve
+    ? arcProfile(curve, reverse)
+    : cubicProfile(curve, reverse);
+}
+
 function createShapeFromProfile(
   commands: HoverDiningTableProfileCommand[],
 ) {
@@ -1369,6 +1581,15 @@ function createShapeFromProfile(
         command.control2.y,
         command.to.x,
         command.to.y,
+      );
+    } else if (command.kind === "arc") {
+      shape.absarc(
+        command.center.x,
+        command.center.y,
+        command.radius,
+        command.startAngle,
+        command.endAngle,
+        command.clockwise,
       );
     } else {
       shape.closePath();
@@ -1429,6 +1650,60 @@ function roundedRectangleProfile(
       kind: "cubic",
       control1: { x: -halfWidth, y: -halfHeight + safeRadius - control },
       control2: { x: -halfWidth + safeRadius - control, y: -halfHeight },
+      to: { x: -halfWidth + safeRadius, y: -halfHeight },
+    },
+    { kind: "close" },
+  ];
+}
+
+function circularRoundedRectangleProfile(
+  width: number,
+  height: number,
+  radius: number,
+): HoverDiningTableProfileCommand[] {
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  const safeRadius = Math.min(radius, halfWidth, halfHeight);
+  return [
+    { kind: "move", to: { x: -halfWidth + safeRadius, y: -halfHeight } },
+    { kind: "line", to: { x: halfWidth - safeRadius, y: -halfHeight } },
+    {
+      kind: "arc",
+      center: { x: halfWidth - safeRadius, y: -halfHeight + safeRadius },
+      radius: safeRadius,
+      startAngle: -Math.PI / 2,
+      endAngle: 0,
+      clockwise: false,
+      to: { x: halfWidth, y: -halfHeight + safeRadius },
+    },
+    { kind: "line", to: { x: halfWidth, y: halfHeight - safeRadius } },
+    {
+      kind: "arc",
+      center: { x: halfWidth - safeRadius, y: halfHeight - safeRadius },
+      radius: safeRadius,
+      startAngle: 0,
+      endAngle: Math.PI / 2,
+      clockwise: false,
+      to: { x: halfWidth - safeRadius, y: halfHeight },
+    },
+    { kind: "line", to: { x: -halfWidth + safeRadius, y: halfHeight } },
+    {
+      kind: "arc",
+      center: { x: -halfWidth + safeRadius, y: halfHeight - safeRadius },
+      radius: safeRadius,
+      startAngle: Math.PI / 2,
+      endAngle: Math.PI,
+      clockwise: false,
+      to: { x: -halfWidth, y: halfHeight - safeRadius },
+    },
+    { kind: "line", to: { x: -halfWidth, y: -halfHeight + safeRadius } },
+    {
+      kind: "arc",
+      center: { x: -halfWidth + safeRadius, y: -halfHeight + safeRadius },
+      radius: safeRadius,
+      startAngle: Math.PI,
+      endAngle: Math.PI * 1.5,
+      clockwise: false,
       to: { x: -halfWidth + safeRadius, y: -halfHeight },
     },
     { kind: "close" },
@@ -1588,6 +1863,21 @@ function sampleClosedProfile(
         roundedEdges.push(command.edgeTreatment !== "square");
       }
       current = end;
+    } else if (command.kind === "arc") {
+      let sweep = command.endAngle - command.startAngle;
+      if (command.clockwise && sweep > 0) sweep -= Math.PI * 2;
+      if (!command.clockwise && sweep < 0) sweep += Math.PI * 2;
+      for (let index = 1; index <= curveSegments; index += 1) {
+        const angle = command.startAngle + sweep * (index / curveSegments);
+        points.push(
+          new THREE.Vector2(
+            command.center.x + Math.cos(angle) * command.radius,
+            command.center.y + Math.sin(angle) * command.radius,
+          ),
+        );
+        roundedEdges.push(command.edgeTreatment !== "square");
+      }
+      current = new THREE.Vector2(command.to.x, command.to.y);
     } else {
       roundedEdges.push(command.edgeTreatment !== "square");
     }
@@ -1658,8 +1948,8 @@ function offsetProfileEdges(
 
 /**
  * Creates a face-edge round-over while leaving rail/stile glue seams square.
- * Per-edge offsets keep every ring vertex aligned, so changing a Bézier radius,
- * tension, splay, depth, or round-over regenerates a closed fabrication solid
+ * Per-edge offsets keep every ring vertex aligned, so changing a corner radius,
+ * splay, depth, or round-over regenerates a closed fabrication solid
  * rather than a beveled visual stand-in.
  */
 function createSelectivelyRoundedExtrusion(
@@ -1707,7 +1997,15 @@ function createSelectivelyRoundedExtrusion(
     a: THREE.Vector3,
     b: THREE.Vector3,
     c: THREE.Vector3,
-  ) => positions.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+  ) => {
+    const areaSquared = b
+      .clone()
+      .sub(a)
+      .cross(c.clone().sub(a))
+      .lengthSq();
+    if (areaSquared <= EPSILON ** 2) return;
+    positions.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+  };
   const as3 = (point: THREE.Vector2, x: number) =>
     new THREE.Vector3(x, point.x, point.y);
   const perimeterCount = sampled.points.length;
@@ -1752,31 +2050,49 @@ function createSelectivelyRoundedExtrusion(
 
 /**
  * Splits the finished end-box face profile at the four curve-tangent seams.
- * The two rails own both the inner and outer Bézier corners; the two stiles
+ * The two rails own both the inner and outer corner returns; the two stiles
  * retain the exact derived splay between those seams. This is the shared
  * fabrication profile used by exploded geometry and the cut sheet.
  */
 function createEndBoxPartProfiles(spec: HoverDiningTableSpec) {
-  const outer = getRoundedTrapezoidDefinition(
-    spec.frameBottomWidth,
-    spec.frameTopWidth,
-    0,
-    spec.frameHeight,
-    spec.frameOuterBottomCornerRadius,
-    spec.frameOuterTopCornerRadius,
-    spec.frameOuterRailCurveTension,
-    spec.frameOuterStileCurveTension,
-  );
-  const inner = getRoundedTrapezoidDefinition(
-    spec.openingBottomWidth,
-    spec.openingTopWidth,
-    spec.openingBottom,
-    spec.openingTop,
-    spec.frameInnerBottomCornerRadius,
-    spec.frameInnerTopCornerRadius,
-    spec.frameInnerRailCurveTension,
-    spec.frameInnerStileCurveTension,
-  );
+  const outer = spec.frameCornerStyle === "circular"
+    ? getCircularRoundedTrapezoidDefinition(
+        spec.frameBottomWidth,
+        spec.frameTopWidth,
+        0,
+        spec.frameHeight,
+        spec.frameOuterBottomCornerRadius,
+        spec.frameOuterTopCornerRadius,
+      )
+    : getRoundedTrapezoidDefinition(
+        spec.frameBottomWidth,
+        spec.frameTopWidth,
+        0,
+        spec.frameHeight,
+        spec.frameOuterBottomCornerRadius,
+        spec.frameOuterTopCornerRadius,
+        spec.frameOuterRailCurveTension,
+        spec.frameOuterStileCurveTension,
+      );
+  const inner = spec.frameCornerStyle === "circular"
+    ? getCircularRoundedTrapezoidDefinition(
+        spec.openingBottomWidth,
+        spec.openingTopWidth,
+        spec.openingBottom,
+        spec.openingTop,
+        spec.frameInnerBottomCornerRadius,
+        spec.frameInnerTopCornerRadius,
+      )
+    : getRoundedTrapezoidDefinition(
+        spec.openingBottomWidth,
+        spec.openingTopWidth,
+        spec.openingBottom,
+        spec.openingTop,
+        spec.frameInnerBottomCornerRadius,
+        spec.frameInnerTopCornerRadius,
+        spec.frameInnerRailCurveTension,
+        spec.frameInnerStileCurveTension,
+      );
   const squareClose = { kind: "close", edgeTreatment: "square" } as const;
   const rightOuterFloor = new THREE.Vector2(spec.frameBottomWidth / 2, 0);
   const rightInnerFloor = new THREE.Vector2(spec.openingBottomWidth / 2, 0);
@@ -1785,24 +2101,24 @@ function createEndBoxPartProfiles(spec: HoverDiningTableSpec) {
   const profiles: Record<EndBoxPartPosition, HoverDiningTableProfileCommand[]> = {
     top: [
       moveProfile(outer.leftUpper),
-      cubicProfile(outer.topLeftCurve, true),
+      curvedProfile(outer.topLeftCurve, true),
       lineProfile(outer.topRightEnd),
-      cubicProfile(outer.topRightCurve, true),
+      curvedProfile(outer.topRightCurve, true),
       lineProfile(inner.rightUpper, "square"),
-      cubicProfile(inner.topRightCurve),
+      curvedProfile(inner.topRightCurve),
       lineProfile(inner.topLeftStart),
-      cubicProfile(inner.topLeftCurve),
+      curvedProfile(inner.topLeftCurve),
       squareClose,
     ],
     bottom: [
       moveProfile(outer.leftLower),
-      cubicProfile(outer.bottomLeftCurve),
+      curvedProfile(outer.bottomLeftCurve),
       lineProfile(outer.bottomRightStart),
-      cubicProfile(outer.bottomRightCurve),
+      curvedProfile(outer.bottomRightCurve),
       lineProfile(inner.rightLower, "square"),
-      cubicProfile(inner.bottomRightCurve, true),
+      curvedProfile(inner.bottomRightCurve, true),
       lineProfile(inner.bottomLeftStart),
-      cubicProfile(inner.bottomLeftCurve, true),
+      curvedProfile(inner.bottomLeftCurve, true),
       squareClose,
     ],
     right: spec.endFrameStyle === "box"
@@ -1864,7 +2180,8 @@ function createEndBoxPartFabricationProfile(
         spec.frameEdgeRoundover,
       ),
     },
-    bezier: position === "top" || position === "bottom"
+    bezier: (position === "top" || position === "bottom") &&
+        spec.frameCornerStyle === "bezier"
       ? {
           outerRadius: position === "top"
             ? spec.frameOuterTopCornerRadius
@@ -1876,6 +2193,17 @@ function createEndBoxPartFabricationProfile(
           outerStileTension: spec.frameOuterStileCurveTension,
           innerRailTension: spec.frameInnerRailCurveTension,
           innerStileTension: spec.frameInnerStileCurveTension,
+        }
+      : undefined,
+    cornerRadii: (position === "top" || position === "bottom") &&
+        spec.frameCornerStyle === "circular"
+      ? {
+          outerRadius: position === "top"
+            ? spec.frameOuterTopCornerRadius
+            : spec.frameOuterBottomCornerRadius,
+          innerRadius: position === "top"
+            ? spec.frameInnerTopCornerRadius
+            : spec.frameInnerBottomCornerRadius,
         }
       : undefined,
   };
@@ -2159,7 +2487,7 @@ function assertFabricationProfile(
     }
   } else if (
     !Number.isFinite(profile.section.radius) ||
-    profile.section.radius <= 0 ||
+    (profile.section.radius <= 0 && sectionTopRadius <= 0) ||
     !profile.section.outline.some((command) => command.kind === "cubic")
   ) {
     throw new Error(`${label} must retain a curved edge-treatment section`);
@@ -2171,10 +2499,17 @@ function assertFabricationProfile(
   const cubicCount = profile.outline.filter(
     (command) => command.kind === "cubic",
   ).length;
+  const arcCount = profile.outline.filter(
+    (command) => command.kind === "arc",
+  ).length;
   if (profile.family === "frame-rail") {
-    if (cubicCount !== 4 || squareEdgeCount !== 2 || !profile.bezier) {
+    const hasBezierReturns =
+      cubicCount === 4 && arcCount === 0 && Boolean(profile.bezier);
+    const hasCircularReturns =
+      arcCount === 4 && cubicCount === 0 && Boolean(profile.cornerRadii);
+    if ((!hasBezierReturns && !hasCircularReturns) || squareEdgeCount !== 2) {
       throw new Error(
-        `${label} rail must retain four Bézier returns and two square tangent seams`,
+        `${label} rail must retain four consistent corner returns and two square tangent seams`,
       );
     }
   } else if (profile.family === "frame-stile") {
@@ -2640,20 +2975,33 @@ function createBraceFabricationProfile(
 function createStraightSupportFabricationProfile(
   support: StraightSupportSpec,
 ): HoverDiningTableFabricationProfile {
-  const outline = rectangleProfile(support.spanX, support.width);
+  const outline = support.endRadius > EPSILON
+    ? circularRoundedRectangleProfile(
+        support.spanX,
+        support.width,
+        support.endRadius,
+      )
+    : rectangleProfile(support.spanX, support.width);
   return {
     family: "support",
     outline,
     bounds: profileBounds(outline),
+    support: {
+      endRadius: support.endRadius,
+    },
     section: {
       width: support.width,
       thickness: support.thickness,
       radius: support.edgeRadius,
       topRadius: support.topEdgeRadius,
       label:
-        support.topEdgeRadius > EPSILON
+        support.edgeRadius > EPSILON && support.topEdgeRadius > EPSILON
           ? "bottom + top long-edge round-overs"
-          : "bottom long-edge round-over",
+          : support.topEdgeRadius > EPSILON
+            ? "top long-edge round-over"
+            : support.edgeRadius > EPSILON
+              ? "bottom long-edge round-over"
+              : "square long edges",
       outline: supportRoundedRectangleProfile(
         support.width,
         support.thickness,
@@ -3159,25 +3507,45 @@ function createStraightSupportParts(
     halfLapDepth: support.thickness / 2,
   };
   return support.centerYs.map((centerY) => {
-    const geometry = createRoundedPlanPrism(
-      ensureCounterClockwise([
-        new THREE.Vector2(-halfX, -halfWidth),
-        new THREE.Vector2(halfX, -halfWidth),
-        new THREE.Vector2(halfX, halfWidth),
-        new THREE.Vector2(-halfX, halfWidth),
-      ]),
-      support.zBottom,
-      support.zTop,
-      prismSpec,
-      1,
-      true,
-      true,
-      model.geometry.braceRoundoverSegments,
-    );
+    const geometry = support.endRadius > EPSILON
+      ? createSelectivelyRoundedExtrusion(
+          supportRoundedRectangleProfile(
+            support.width,
+            support.thickness,
+            support.edgeRadius,
+            support.topEdgeRadius,
+          ),
+          support.spanX,
+          support.endRadius,
+          model.geometry.curveSegments,
+          model.geometry.braceRoundoverSegments,
+          0,
+        )
+      : createRoundedPlanPrism(
+          ensureCounterClockwise([
+            new THREE.Vector2(-halfX, -halfWidth),
+            new THREE.Vector2(halfX, -halfWidth),
+            new THREE.Vector2(halfX, halfWidth),
+            new THREE.Vector2(-halfX, halfWidth),
+          ]),
+          support.zBottom,
+          support.zTop,
+          prismSpec,
+          1,
+          true,
+          true,
+          model.geometry.braceRoundoverSegments,
+        );
     if (!geometry) {
       throw new Error("Unable to create straight support geometry");
     }
-    geometry.translate(0, centerY, 0);
+    geometry.translate(
+      0,
+      centerY,
+      support.endRadius > EPSILON
+        ? (support.zBottom + support.zTop) / 2
+        : 0,
+    );
     return geometry;
   });
 }
@@ -3369,13 +3737,24 @@ function createStraightSupportCutPart(
     fabricationProfile: createStraightSupportFabricationProfile(support),
     cutAngleDegrees: 0,
     notes: [
-      "Square end faces bear flush on the parallel end-box inside faces.",
-      support.topEdgeRadius > EPSILON
+      support.endRadius > EPSILON
+        ? "Round over each end-face perimeter to the listed radius while preserving a flat central bearing face against the transverse rail."
+        : "Square end faces bear flush on the parallel end-box inside faces.",
+      support.edgeRadius > EPSILON && support.topEdgeRadius > EPSILON
         ? "Round over the bottom and top long edges to their independently listed radii."
-        : "Round over the bottom long edge to the listed radius; leave the top edge square.",
+        : support.topEdgeRadius > EPSILON
+          ? "Round over both tabletop-facing top long edges to the listed radius; leave the bottom edges square."
+          : support.edgeRadius > EPSILON
+            ? "Round over the bottom long edges to the listed radius; leave the top edges square."
+            : "Leave the long edges square.",
     ],
     processDimensions: [
-      { label: "Bottom edge round-over", value: support.edgeRadius },
+      ...(support.edgeRadius > EPSILON
+        ? [{ label: "Bottom edge round-over", value: support.edgeRadius }]
+        : []),
+      ...(support.endRadius > EPSILON
+        ? [{ label: "End-face round-over", value: support.endRadius }]
+        : []),
       ...(support.topEdgeRadius > EPSILON
         ? [{ label: "Top edge round-over", value: support.topEdgeRadius }]
         : []),
@@ -3527,33 +3906,37 @@ export function getHoverDiningTableCutList(
       notes: [
         spec.endFrameStyle === "box"
           ? "One finished top rail per end box; profile includes both routed inner and outer corner curves."
-          : "One finished top rail per open leg frame; its paired inner and outer Bézier returns form the distinctive wave-shaped shoulder.",
+          : "One finished top rail per open leg frame; its paired inner and outer circular fillets form the distinctive wave-shaped shoulder.",
         "Tangent seams remain square for the leg glue joints.",
       ],
       processDimensions: [
         { label: "Outer top radius", value: spec.frameOuterTopCornerRadius },
         { label: "Inner top radius", value: spec.frameInnerTopCornerRadius },
         { label: "Face-edge round-over", value: spec.frameEdgeRoundover },
-        {
-          label: "Outer rail-side sweep",
-          value: spec.frameOuterRailCurveTension,
-          format: "ratio",
-        },
-        {
-          label: "Outer stile-side sweep",
-          value: spec.frameOuterStileCurveTension,
-          format: "ratio",
-        },
-        {
-          label: "Inner rail-side sweep",
-          value: spec.frameInnerRailCurveTension,
-          format: "ratio",
-        },
-        {
-          label: "Inner stile-side sweep",
-          value: spec.frameInnerStileCurveTension,
-          format: "ratio",
-        },
+        ...(spec.frameCornerStyle === "bezier"
+          ? [
+              {
+                label: "Outer rail-side sweep",
+                value: spec.frameOuterRailCurveTension,
+                format: "ratio" as const,
+              },
+              {
+                label: "Outer stile-side sweep",
+                value: spec.frameOuterStileCurveTension,
+                format: "ratio" as const,
+              },
+              {
+                label: "Inner rail-side sweep",
+                value: spec.frameInnerRailCurveTension,
+                format: "ratio" as const,
+              },
+              {
+                label: "Inner stile-side sweep",
+                value: spec.frameInnerStileCurveTension,
+                format: "ratio" as const,
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -3868,7 +4251,7 @@ export function createHoverDiningTableCutPartGeometry(
 /**
  * Returns independently movable, fabrication-complete glue-up pieces for the
  * selected support layout. The four bars of each end box share the assembled
- * Bézier/tangent constraints, while selective face round-overs leave every
+ * shared curve/tangent constraints, while selective face round-overs leave every
  * glue seam square.
  */
 export function createHoverDiningTableExplodedParts(
@@ -4346,6 +4729,9 @@ export function getHoverDiningTableParameterLimits(
         spec.frameDepth,
         spec.frameSideWidth,
         spec.frameTopRailHeight,
+        ...(spec.matchLengthwiseRailRoundover
+          ? [spec.upperStretchers.width, spec.upperStretchers.thickness]
+          : []),
         ...(spec.endFrameStyle === "box" ? [spec.frameBottomRailHeight] : []),
       ) /
         2 -
@@ -5423,7 +5809,9 @@ export function getHoverDiningTableAuditValue(
     case "hoverCornerCurves":
       return item(
         check.label,
-        spec.endFrameStyle === "box"
+        spec.frameCornerStyle === "circular"
+          ? `Circular Wave shoulders · outer R ${formatLength(spec.frameOuterTopCornerRadius, unit)} / inner R ${formatLength(spec.frameInnerTopCornerRadius, unit)} · tangent to rail + legs`
+          : spec.endFrameStyle === "box"
           ? `outer top/bottom ${formatLength(spec.frameOuterTopCornerRadius, unit)} / ${formatLength(spec.frameOuterBottomCornerRadius, unit)} κ rail ${spec.frameOuterRailCurveTension.toFixed(3)} / stile ${spec.frameOuterStileCurveTension.toFixed(3)} · inner top/bottom ${formatLength(spec.frameInnerTopCornerRadius, unit)} / ${formatLength(spec.frameInnerBottomCornerRadius, unit)} κ rail ${spec.frameInnerRailCurveTension.toFixed(3)} / stile ${spec.frameInnerStileCurveTension.toFixed(3)}`
           : `Wave-curve top shoulders · outer ${formatLength(spec.frameOuterTopCornerRadius, unit)} / inner ${formatLength(spec.frameInnerTopCornerRadius, unit)} · κ rail ${spec.frameOuterRailCurveTension.toFixed(3)} / ${spec.frameInnerRailCurveTension.toFixed(3)} · κ leg ${spec.frameOuterStileCurveTension.toFixed(3)} / ${spec.frameInnerStileCurveTension.toFixed(3)}`,
       );
@@ -5452,7 +5840,7 @@ export function getHoverDiningTableAuditValue(
               : 0;
         return item(
           check.label,
-          `${4 + (spec.cornerKneeBraces.enabled ? 8 : 0) + bottomFaceCount} ${spec.endFrameStyle === "box" ? "box" : "frame"}-parallel support end faces · selected members stop on straight contact zones · ${formatLength(spec.upperBrace.edgeRadius, unit)} bottom-edge round-over`,
+          `${4 + (spec.cornerKneeBraces.enabled ? 8 : 0) + bottomFaceCount} ${spec.endFrameStyle === "box" ? "box" : "frame"}-parallel support end faces · selected members stop on straight contact zones · ${formatLength(spec.upperStretchers.topEdgeRadius > EPSILON ? spec.upperStretchers.topEdgeRadius : spec.upperStretchers.edgeRadius, unit)} ${spec.upperStretchers.endRadius > EPSILON ? `${spec.upperStretchers.topEdgeRadius > EPSILON ? "top-edge" : "bottom-edge"} + end-face round-over` : `${spec.upperStretchers.topEdgeRadius > EPSILON ? "top-edge" : "bottom-edge"} round-over`}${spec.matchLengthwiseRailRoundover ? " matching legs" : ""}`,
         );
       }
     case "hoverHalfLaps":
@@ -5482,7 +5870,7 @@ export function getHoverDiningTableAuditValue(
     case "hoverExplodedAssembly":
       return item(
         check.label,
-        `${getHoverDiningTablePieceCount(params)} constrained solids · mortised profiled top · 3 steel C-channels · ${spec.endFrameStyle === "box" ? "4 Bézier rails · 4 tangent-seam stiles" : "2 wave-curve rails · 4 full-height legs"} · selected finished supports${spec.cornerKneeBraces.enabled ? " · 4 top-frame knee braces" : ""}${spec.levelingFeet.enabled ? " · 4 leveling feet" : ""}`,
+        `${getHoverDiningTablePieceCount(params)} constrained solids · mortised profiled top · 3 steel C-channels · ${spec.endFrameStyle === "box" ? "4 Bézier rails · 4 tangent-seam stiles" : "2 circular-radius wave rails · 4 full-height legs"} · selected finished supports${spec.cornerKneeBraces.enabled ? " · 4 top-frame knee braces" : ""}${spec.levelingFeet.enabled ? " · 4 leveling feet" : ""}`,
       );
     case "hoverCutList":
       {

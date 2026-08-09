@@ -2,7 +2,7 @@
   "id": "wave-dining-table",
   "name": "The Wave",
   "subtitle": "Open-leg dining table",
-  "description": "A 1:10 manipulation model that keeps the Hover top, paired wave-curve rail shoulders, and two lengthwise upper rails while replacing each closed end box with two full-height legs.",
+  "description": "A 1:10 manipulation model that keeps the Hover top, paired constant-radius wave shoulders, and two lengthwise upper rails while replacing each closed end box with two full-height legs.",
   "viewer": "hover-dining-table-v1",
   "stl": {
     "fileName": "wave-dining-table.stl",
@@ -208,34 +208,6 @@
       "limits": { "min": 12.7, "max": 203.2, "step": 3.175 }
     },
     {
-      "key": "frameOuterRailCurveTension",
-      "label": "Outer corner rail-side sweep",
-      "group": "End boxes",
-      "default": 0.552,
-      "limits": { "min": 0.35, "max": 0.8, "step": 0.01 }
-    },
-    {
-      "key": "frameOuterStileCurveTension",
-      "label": "Outer corner stile-side sweep",
-      "group": "End boxes",
-      "default": 0.552,
-      "limits": { "min": 0.35, "max": 0.8, "step": 0.01 }
-    },
-    {
-      "key": "frameInnerRailCurveTension",
-      "label": "Inner corner rail-side sweep",
-      "group": "End boxes",
-      "default": 0.58,
-      "limits": { "min": 0.35, "max": 0.8, "step": 0.01 }
-    },
-    {
-      "key": "frameInnerStileCurveTension",
-      "label": "Inner corner stile-side sweep",
-      "group": "End boxes",
-      "default": 0.58,
-      "limits": { "min": 0.35, "max": 0.8, "step": 0.01 }
-    },
-    {
       "key": "frameEdgeRoundover",
       "label": "End-box face-edge round-over",
       "group": "End boxes",
@@ -328,10 +300,17 @@
     },
     {
       "key": "topSupportEdgeRadius",
-      "label": "Top support bottom round-over",
+      "label": "Lengthwise rail top/end round-over",
       "group": "Top support members",
-      "default": 3.175,
+      "default": 9.525,
       "limits": { "min": 0.79375, "max": 19.05, "step": 1.5875 }
+    },
+    {
+      "key": "matchLengthwiseRailRoundover",
+      "label": "Match the leg round-over",
+      "group": "Top support members",
+      "default": 1,
+      "limits": { "min": 0, "max": 1, "step": 1 }
     },
     {
       "key": "cornerBraceReach",
@@ -418,9 +397,9 @@
       "The tabletop has independently editable plan-view corner radii, length-end face round-overs, and continuous Bézier-rolled long edges.",
       "Exactly three blackened-steel C-channels run widthwise in flush underside mortises: one centered and two symmetrically derived between the leg frames, all clear of the rolled long edges.",
       "The default base contains two open transverse frames, each built from one 2 in high sculpted top rail and two 2 in wide by 4 in deep full-height legs, with two parallel lengthwise upper rails, four plan-view corner knee braces, and no floor connector.",
-      "Each top rail owns paired outer and inner cubic Bézier returns that flow tangent into the legs and preserve the distinctive wave-shaped shoulder; the floor remains open between the legs.",
+      "Each top rail owns paired outer and inner circular-radius returns that flow tangent into the legs and preserve the distinctive wave-shaped shoulder; the floor remains open between the legs.",
       "Every selected X crosses at the table center with a derived 50/50 half-lap and no overlapping solid volume; straight-support layouts contain no artificial lap.",
-      "Top-support width, thickness, bearing-zone inset, and bottom-edge round-over remain editable. The shared Hover parameter schema retains dormant bottom-support dimensions, but The Wave normalizes the lower layout to none and never generates a floor connector.",
+      "Top-support width, thickness, bearing-zone inset, and round-over remain editable; the lengthwise rails match the leg radius along their tabletop-facing top edges and end-face perimeters by default and can be decoupled. Those two rail curves blend together at each leg-frame junction while each rounded end retains a flat central bearing face against the transverse rail. The shared Hover parameter schema retains dormant bottom-support dimensions, but The Wave normalizes the lower layout to none and never generates a floor connector.",
       "Four recessed adjustable feet align beneath the full-height legs and are enabled by default; they are the only floor contacts and do not add a lower support between the legs.",
       "The two default upper lengthwise rails bear directly against the tabletop underside and terminate flush against the inside faces of the two open leg frames.",
       "Four mirrored 45-degree knee braces connect the inside faces of the two lengthwise rails and two transverse top rails, closing one plan-view triangle at every corner with positive joinery required at both ends.",
@@ -439,22 +418,22 @@
       "For each selected X, derive both diagonal lengths and equal-and-opposite plan angles from the end-box corner zones and keep the crossing at the table origin.",
       "Derive each brace endpoint from the straight-rail tangent of the editable inner corner radius, inset the complete angled end face clear of that curve, and keep the support end planar and parallel with the end-box inside face; rail height controls vertical bearing overlap independently of support thickness.",
       "Keep each selected X brace at full nominal width through the crossing, form complementary centered pockets at exactly half the nominal thickness, align every pocket boundary as a planar machining cut, and remove solid overlap between the two braces.",
-      "Round over the independently specified bottom long edges of every selected support and the optional top long edge of the selected bottom support while keeping end miters and half-lap shoulders square.",
+      "Round over the independently specified bottom long edges of the shared support layouts and the optional top long edge of the selected bottom support. For The Wave, round the tabletop-facing top long edges and end-face perimeters of both lengthwise rails to one matching radius with flat bearing centers; keep their bottom edges, X-brace end miters, knee-brace housed-joint edges, and half-lap shoulders square.",
       "Keep every selected top-support envelope coplanar with the tabletop underside. Raise every lower wood member with the end boxes when leveling feet are enabled so the four pads are the only floor contacts; return all lower wood to Z = 0 when feet are disabled.",
       "When open leg frames use lengthwise upper rails, derive four mirrored corner knee braces from one editable rail-face reach; keep their 45-degree faces in zero-gap contact with the inside faces of the transverse and lengthwise rails, derive width and thickness from the joined upper members, and keep the housed-joint edges square.",
       "Credit the corner braces only as top-plane triangles, require positive load-transferring joinery at both ends, and do not treat them as vertical leg bracing, a lower torsional plane, or structural certification.",
       "Center each leveling-foot rod beneath a stile, keep its rounded-bottom entry circle inside solid wood, report its exposed and embedded lengths, and reduce local end-box height by the installed extension while preserving the overall tabletop height.",
-      "Keep inner and outer corner curves as cubic Bézier functions whose control lengths equal radius times normalized tension; rail-side and stile-side handles remain independently editable for both curve families.",
+      "Keep inner and outer Wave shoulders as true circular fillets tangent to the horizontal top rail and full-height legs; expose radii only, with no Bézier sweep controls.",
       "Keep top and bottom exterior and interior corner radii independently editable because the observed curves are not concentric offsets.",
-      "Keep the selected top-support section and bottom-edge radius independently editable. Retain the shared bottom-support metadata for schema compatibility, but normalize every Wave URL and UI edit to no lower support.",
+      "Keep the selected top-support section and round-over radius editable. Match the lengthwise rails' tabletop-facing top edges and end-face perimeters to the leg face-edge round-over by default, blend those two curves at each leg-frame junction, retain an explicit opt-out, preserve flat central end bearing, and carry that choice through URL state, geometry, cut lists, exports, and audit text. Retain the shared bottom-support metadata for schema compatibility, but normalize every Wave URL and UI edit to no lower support.",
       "Treat bottom spread as the explicit splay hypothesis; zero means orthogonal frame sides and remains the evidence-backed default.",
       "Keep frame edge round-over below half the depth, leg width, and top-rail height; keep leg width independently editable because the lengthwise rails bear on the horizontal top rails rather than setting leg width.",
       "Keep both leg frames, their bottom spread, and all support endpoints inside the tabletop width while preserving positive longitudinal spans.",
-      "Derive the exploded rail, stile, tabletop, X-brace, stretcher, and center-board solids from the same Bézier, splay, round-over, contact-plane, and half-lap constraints used by the assembled model; do not substitute proxy blanks.",
+      "Derive the exploded rail, stile, tabletop, X-brace, stretcher, and center-board solids from the same circular-radius, splay, round-over, contact-plane, and half-lap constraints used by the assembled model; do not substitute proxy blanks.",
       "Derive assembled, exploded, cut-list, and STL corner-brace solids from the same clipped 45-degree plan footprint and rail-face contact planes; do not substitute rectangular proxy blanks.",
       "Keep exploded offsets presentation-only: parameter edits and layout changes must regenerate the selected 12–20 fully profiled wood and steel pieces without changing the assembled STL contract or resetting the camera.",
-      "Keep the cut list full-size and associative to the furniture parameters: changing mock scale must not change a listed fabrication dimension, while dimensional edits must update the schedule, exact SVG profile, section view, radii, tensions, round-overs, end cuts, and half-lap geometry.",
-      "Derive separate full-size top-rail and mirrored full-height-leg routing templates from the exact finished B1/B3 part profiles used by the assembled, exploded, and cut-list modes; each top rail owns its Bézier corner returns and each leg runs from one tangent seam to the floor.",
+      "Keep the cut list full-size and associative to the furniture parameters: changing mock scale must not change a listed fabrication dimension, while dimensional edits must update the schedule, exact SVG profile, section view, circular radii, round-overs, end cuts, and half-lap geometry.",
+      "Derive separate full-size top-rail and mirrored full-height-leg routing templates from the exact finished B1/B3 part profiles used by the assembled, exploded, and cut-list modes; each top rail owns its circular corner returns and each leg runs from one tangent seam to the floor.",
       "Split both routing templates by the editable usable square print-plate span, keep every STL flat and inside that envelope, and join adjacent pieces with complementary in-plane dovetails sized by explicit depth and fit-clearance controls.",
       "Keep routing-template export at full furniture size and 1/8 in nominal thickness regardless of the manipulation-model scale; use the mock-scale denominator only for the on-screen template preview.",
       "Label listed sizes as finished nominal dimensions and keep rough-milling allowance explicit rather than silently adding stock to any part.",
