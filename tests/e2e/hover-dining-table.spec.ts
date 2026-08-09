@@ -2215,7 +2215,7 @@ test("renders, manipulates, and exports the oak X-Hover table", async ({
   await expect(page.locator(".inspector-design-checks")).toBeHidden();
   const librarySidebar = page.getByLabel("Workspace model library");
   await librarySidebar
-    .getByRole("button", { name: "Model Library", exact: true })
+    .getByRole("button", { name: "Jig Library", exact: true })
     .click();
   await expect(designChecks).toBeHidden();
   await librarySidebar

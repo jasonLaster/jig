@@ -1,47 +1,25 @@
-# 3D Prints
+# Jig
 
-Parametric React/Three.js viewers for printable 3D models.
+Jig is the focused home for parametric woodworking models. It combines live
+React/Three.js workspaces with fabrication views, structural design screens,
+URL-backed parameters, registered STL exports, saved versions, and generated
+brochures.
+
+Production: [jig.jlast.io](https://jig.jlast.io)
 
 ## Models
 
-Models are registered in `public/models/index.json`. Each model has its own
-folder under `public/models/<model-id>/` with a `model.json` file and one or
-more STL files.
+The active catalog lives in `public/models/index.json`:
 
-Current models:
+- `dining-table` — Plate Table
+- `whisperer` — Whisperer
+- `hover-dining-table` — X-Hover Dining Table
+- `wave-dining-table` — The Wave
+- `concentric-tube-jig` — Concentric Tube Jig
 
-- `paper-towel-holder`
-  - STL: `public/models/paper-towel-holder/paper-towel-holder.stl`
-  - Config: `public/models/paper-towel-holder/model.json`
-  - Audit script: `models/paper-towel-holder/audit.mjs`
-- `japandi-tray`
-  - STL: `public/models/japandi-tray/japandi-tray.stl`
-  - Config: `public/models/japandi-tray/model.json`
-  - Audit script: `models/japandi-tray/audit.mjs`
-- `simple-box`
-  - STL: `public/models/simple-box/simple-box.stl`
-  - Config: `public/models/simple-box/model.json`
-  - Audit script: `models/simple-box/audit.mjs`
-  - Source generator: `models/simple-box/generate-source.mjs`
-- `door-lock-adapter`
-  - STL: `public/models/door-lock-adapter/door-lock-adapter.stl`
-  - Config: `public/models/door-lock-adapter/model.json`
-  - Audit script: `models/door-lock-adapter/audit.mjs`
-  - Source generator: `models/door-lock-adapter/generate-source.mjs`
-
-The model JSON owns the display name, STL URL, parameter definitions, audit
-checks, dimension invariants, and associated scripts for that print.
-
-## Workspace And Persistence
-
-The root route opens the default model workspace. Catalog models live in the
-left sidebar, and saved versions or forks are scoped to the selected model.
-Saved versions and forks are backed by Convex through the Vercel Marketplace
-integration. The schema and functions live in `convex/`, and the workspace
-actions menu saves generated STL snapshots plus parameter state.
-
-See `docs/convex-library.md` for the storage model, user flows, local setup, and
-Vercel deployment command.
+Each model owns its public configuration and registered STL under
+`public/models/<model-id>/`. Table geometry, fabrication layouts, audits, and
+exports share the same parametric source so the surfaces stay synchronized.
 
 ## Development
 
@@ -50,21 +28,18 @@ npm install
 npm run dev
 ```
 
-## Validation
+## Verification
 
 ```bash
-npm run build
 npm run audit
-npm run audit -- japandi-tray
-npm run audit -- simple-box
-npm run audit -- door-lock-adapter
-npm run test:e2e
-npm run verify
-npm run build:vercel
+npm run build
+npx playwright test --workers=1
 ```
 
-`docs/specifications.md` defines the product and engineering contract.
-`docs/test-plan.md` defines the release gates. `docs/testing-and-audit-coverage.md`
-maps the original product requests to the model audit scripts, app behavior, and
-Playwright coverage. The sampled code/docs/tests cross-audit lives in
-`docs/line-coverage-audit.md`.
+The woodworking catalog was extracted from the `3d-prints` project at commit
+`024b42e89b665425bcd017e9039c88b956228df4`. Dormant non-woodworking engine
+code remains temporarily to keep this first extraction low-risk; it is not in
+the Jig catalog or audit surface.
+
+`docs/specifications.md` defines the inherited product contract and
+`docs/test-plan.md` defines the release gates.

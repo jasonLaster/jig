@@ -464,14 +464,14 @@ function synchronizeHoverCrossbarDimensions(
   }
   return next;
 }
-const SIDEBAR_WIDTH_KEY = "3d-prints:sidebar-width";
+const SIDEBAR_WIDTH_KEY = "jig:sidebar-width";
 const SIDEBAR_MIN_WIDTH = 320;
 const SIDEBAR_MAX_WIDTH = 620;
 const SIDEBAR_DEFAULT_WIDTH = 390;
 const INSPECTOR_COLLAPSED_WIDTH = 52;
-const LIBRARY_SIDEBAR_WIDTH_KEY = "3d-prints:library-sidebar-width";
-const THEME_STORAGE_KEY = "3d-prints:theme";
-const BROCHURE_CLIENT_ID_KEY = "3d-prints:brochure-client-id";
+const LIBRARY_SIDEBAR_WIDTH_KEY = "jig:library-sidebar-width";
+const THEME_STORAGE_KEY = "jig:theme";
+const BROCHURE_CLIENT_ID_KEY = "jig:brochure-client-id";
 const ENABLE_TRAY_ORIENTATION_CONTROLS =
   import.meta.env.VITE_ENABLE_TRAY_ORIENTATION_CONTROLS === "true";
 const LIBRARY_SIDEBAR_MIN_WIDTH = 280;
@@ -3444,21 +3444,21 @@ const STRUCTURAL_SOURCE_URLS: Record<
 > = {
   "dining-table": {
     source:
-      "https://github.com/jasonLaster/3d-prints/blob/main/src/models/diningTable.ts",
+      "https://github.com/jasonLaster/jig/blob/main/src/models/diningTable.ts",
     spec:
-      "https://github.com/jasonLaster/3d-prints/blob/main/docs/dining-table-audit-specifications.md",
+      "https://github.com/jasonLaster/jig/blob/main/docs/dining-table-audit-specifications.md",
   },
   "hover-dining-table": {
     source:
-      "https://github.com/jasonLaster/3d-prints/blob/main/src/models/hoverDiningTable.ts",
+      "https://github.com/jasonLaster/jig/blob/main/src/models/hoverDiningTable.ts",
     spec:
-      "https://github.com/jasonLaster/3d-prints/blob/main/docs/hover-dining-table-audit-specifications.md",
+      "https://github.com/jasonLaster/jig/blob/main/docs/hover-dining-table-audit-specifications.md",
   },
   whisperer: {
     source:
-      "https://github.com/jasonLaster/3d-prints/blob/main/src/models/whispererTable.ts",
+      "https://github.com/jasonLaster/jig/blob/main/src/models/whispererTable.ts",
     spec:
-      "https://github.com/jasonLaster/3d-prints/blob/main/docs/whisperer-table-audit-specifications.md",
+      "https://github.com/jasonLaster/jig/blob/main/docs/whisperer-table-audit-specifications.md",
   },
 };
 
@@ -4039,7 +4039,7 @@ function WorkspaceLibrarySidebar({
             setActiveSection("models");
             onToggleCollapsed();
           }}
-          title="Model Library"
+          title="Jig Library"
           type="button"
         >
           <Layers3 aria-hidden="true" />
@@ -4110,7 +4110,7 @@ function WorkspaceLibrarySidebar({
           type="button"
         >
           <Layers3 aria-hidden="true" />
-          Model Library
+          Jig Library
         </button>
         <button
           className={activeSection === "versions" ? "active" : ""}
@@ -5511,7 +5511,7 @@ export default function App({
   }
 
   if (!catalog) {
-    return <LoadingShell message="Loading model library" />;
+    return <LoadingShell message="Loading woodworking library" />;
   }
 
   if (!model || !params) {

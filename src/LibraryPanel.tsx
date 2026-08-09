@@ -73,7 +73,10 @@ function defaultTitle(modelName: string) {
 }
 
 function getModelTypeLabel(modelKey: string) {
-  return modelKey.includes("tray") ? "Tray" : "Holder";
+  if (modelKey.includes("table") || modelKey === "whisperer") {
+    return "Table";
+  }
+  return "Jig";
 }
 
 export function filterLibraryModels<T extends ModelSummary>(
