@@ -37,7 +37,7 @@ npx playwright test --workers=1
 ```
 
 The woodworking catalog is synchronized through `3d-prints` commit
-`9b3270611b43b8a4bb9197f04afaa424cbd65168`. Dormant non-woodworking engine
+`0d438c7e4544bcf3f5273edebcd6553a7c85221b`. Dormant non-woodworking engine
 code remains temporarily to keep this first extraction low-risk; it is not in
 the Jig catalog or audit surface.
 
