@@ -2311,7 +2311,8 @@ html.dark .panel-section:nth-child(even) {
 
 .hover-brochure-image {
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center top;
 }
 
 .hover-brochure-specification {
