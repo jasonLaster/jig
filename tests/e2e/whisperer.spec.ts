@@ -329,6 +329,42 @@ test("renders, persists its feet, and exports registered Whisperer STLs", async 
   expect(pageErrors).toEqual([]);
 });
 
+test("switches between standard, high, and photo oak rendering", async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") pageErrors.push(message.text());
+  });
+
+  await page.goto("/?model=whisperer&unit=in");
+  await expect(page.getByTestId("viewer-status")).toContainText("High render");
+  await expect(page).toHaveURL(/quality=high/);
+
+  await page.getByRole("button", { name: "Workspace actions" }).click();
+  await expect(page.getByLabel("Rendering quality")).toBeVisible();
+  await page.getByRole("button", { name: "Standard", exact: true }).click();
+  await expect(page).toHaveURL(/quality=standard/);
+  await expect(page.getByTestId("viewer-status")).toContainText(
+    "Standard render",
+  );
+
+  await page.getByRole("button", { name: "Photo", exact: true }).click();
+  await expect(page).toHaveURL(/quality=photo/);
+  await expect(page.getByTestId("viewer-status")).toContainText("Photo render");
+  await expect(page.locator(".scene-panel canvas")).toBeVisible();
+
+  const tableLength = page.getByLabel("Table length in inches");
+  await tableLength.fill("70");
+  await tableLength.press("Enter");
+  await expect(page).toHaveURL(/tableLength=70/);
+  await page.reload();
+  await expect(page.getByTestId("viewer-status")).toContainText("Photo render");
+  await expect(tableLength).toHaveValue("70");
+  await expect.poll(() => pageErrors, { timeout: 10_000 }).toEqual([]);
+});
+
 test("shows Whisperer structural checks with its own formulas and sources", async ({
   page,
 }) => {

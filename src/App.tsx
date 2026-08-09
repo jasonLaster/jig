@@ -43,6 +43,7 @@ import {
   useState,
 } from "react";
 import * as THREE from "three";
+import type { WebGLPathTracer } from "three-gpu-pathtracer";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
@@ -121,10 +122,15 @@ import {
   toUnit,
 } from "./units";
 import { createWoodTexture, getWoodSpeciesForModel } from "./woodTexture";
+import {
+  loadOakRenderingAssets,
+  type OakRenderingAssets,
+} from "./oakPbr";
 import type { Id } from "../convex/_generated/dataModel";
 
 type CoreViewMode = "surface" | "fill" | "section";
 type RenderMode = "solid" | "xray" | "wire";
+type RenderQuality = "standard" | "high" | "photo";
 type ThemeMode = "light" | "dark";
 type ViewPreset = "iso" | "top" | "bottom" | "xEdge" | "yEdge";
 type AssemblyMode =
@@ -516,12 +522,46 @@ const RENDER_MODE_LABELS: Record<RenderMode, string> = {
   wire: "Wire",
 };
 
+const RENDER_QUALITY_LABELS: Record<RenderQuality, string> = {
+  standard: "Standard",
+  high: "High",
+  photo: "Photo",
+};
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
 function isThemeMode(value: string | null): value is ThemeMode {
   return value === "light" || value === "dark";
+}
+
+function isRenderQuality(value: string | null): value is RenderQuality {
+  return value === "standard" || value === "high" || value === "photo";
+}
+
+function getRequestedRenderQuality(): RenderQuality {
+  const value = new URLSearchParams(window.location.search).get("quality");
+  return isRenderQuality(value) ? value : "high";
+}
+
+function disposePathTracer(pathTracer: WebGLPathTracer) {
+  // three-gpu-pathtracer 0.0.23 references a renamed private quad in dispose().
+  // Dispose the same owned resources directly until Jig can move to its next
+  // release together with a compatible Three.js upgrade.
+  const internals = pathTracer as unknown as {
+    _quad?: { dispose: () => void; material?: THREE.Material };
+    _pathTracer?: { dispose: () => void };
+    _lowResPathTracer?: { dispose: () => void };
+    _internalBackground?: THREE.Texture;
+    _colorBackground?: THREE.Texture;
+  };
+  internals._quad?.material?.dispose();
+  internals._quad?.dispose();
+  internals._pathTracer?.dispose();
+  internals._lowResPathTracer?.dispose();
+  internals._internalBackground?.dispose();
+  internals._colorBackground?.dispose();
 }
 
 function getInitialUnit(): LengthUnit {
@@ -769,16 +809,22 @@ function serializeUrlParam(key: string, valueMm: number, unit: LengthUnit) {
 function writeUrlState({
   modelId,
   params,
+  renderQuality,
   unit,
 }: {
   modelId: string;
   params: ModelParams;
+  renderQuality: RenderQuality;
   unit: LengthUnit;
 }) {
   const url = new URL(window.location.href);
   url.searchParams.set("model", modelId);
   url.searchParams.set("unit", unit);
   url.searchParams.delete("theme");
+  url.searchParams.delete("quality");
+  if (modelId === "whisperer") {
+    url.searchParams.set("quality", renderQuality);
+  }
 
   for (const key of PARAM_QUERY_KEYS) {
     url.searchParams.delete(key);
@@ -1049,6 +1095,7 @@ const HolderViewer = forwardRef<
     params: ModelParams;
     coreViewMode: CoreViewMode;
     renderMode: RenderMode;
+    renderQuality: RenderQuality;
     showOriginal: boolean;
     theme: ThemeMode;
     unit: LengthUnit;
@@ -1065,6 +1112,7 @@ const HolderViewer = forwardRef<
     params,
     coreViewMode,
     renderMode,
+    renderQuality,
     showOriginal,
     theme,
     unit,
@@ -1076,6 +1124,8 @@ const HolderViewer = forwardRef<
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
+  const pathTracerRef = useRef<WebGLPathTracer | null>(null);
+  const pathTracerRefreshRef = useRef<number | null>(null);
   const mainMeshRef = useRef<THREE.Mesh | null>(null);
   const domeMeshRef = useRef<THREE.Mesh | null>(null);
   const sandMeshRef = useRef<THREE.Mesh | null>(null);
@@ -1213,6 +1263,23 @@ const HolderViewer = forwardRef<
     camera.position.copy(controls.target).add(offset);
     camera.updateProjectionMatrix();
     controls.update();
+  }, []);
+
+  const schedulePathTracerRefresh = useCallback(() => {
+    if (!pathTracerRef.current || !sceneRef.current || !cameraRef.current) {
+      return;
+    }
+    if (pathTracerRefreshRef.current !== null) {
+      window.clearTimeout(pathTracerRefreshRef.current);
+    }
+    pathTracerRefreshRef.current = window.setTimeout(() => {
+      pathTracerRefreshRef.current = null;
+      const pathTracer = pathTracerRef.current;
+      const scene = sceneRef.current;
+      const camera = cameraRef.current;
+      if (!pathTracer || !scene || !camera) return;
+      pathTracer.setScene(scene, camera);
+    }, 140);
   }, []);
 
   const updateMeshes = useCallback(() => {
@@ -1541,7 +1608,18 @@ const HolderViewer = forwardRef<
       model.viewer !== "dining-table-v1" &&
       model.viewer !== "hover-dining-table-v1" &&
       latestShowOriginalRef.current;
-  }, [model]);
+    if (renderQuality !== "standard") {
+      for (const object of [mainMesh, diningHardwareGroup, hoverHardwareGroup]) {
+        object?.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+      }
+    }
+    schedulePathTracerRefresh();
+  }, [model, renderQuality, schedulePathTracerRefresh]);
 
   const createStlBlob = useCallback(() => {
     const mainMesh = mainMeshRef.current;
@@ -1916,8 +1994,19 @@ const HolderViewer = forwardRef<
     renderer.setClearAlpha(theme === "dark" ? 0 : 1);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    const useDetailedLighting =
+      model.id === "whisperer" && renderQuality !== "standard";
+    renderer.toneMapping = useDetailedLighting
+      ? THREE.ACESFilmicToneMapping
+      : THREE.NoToneMapping;
+    renderer.toneMappingExposure = useDetailedLighting ? 0.86 : 1;
+    renderer.shadowMap.enabled = renderQuality !== "standard";
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
     container.append(renderer.domElement);
+
+    let oakAssets: OakRenderingAssets | null = null;
+    let pathTracer: WebGLPathTracer | null = null;
 
     const camera = new THREE.PerspectiveCamera(42, 1, 0.5, 2000);
     camera.up.set(0, 0, 1);
@@ -1939,7 +2028,10 @@ const HolderViewer = forwardRef<
     controls.minDistance = model.viewer === "door-lock-adapter-v1" ? 18 : 80;
     controls.maxDistance = 1400;
     controlsRef.current = controls;
-    const handleControlChange = () => updateCubeOrientation();
+    const handleControlChange = () => {
+      updateCubeOrientation();
+      pathTracer?.updateCamera();
+    };
     let trackpadGestureUntil = 0;
     const handleTrackpadPan = (event: WheelEvent) => {
       if (event.ctrlKey) {
@@ -1986,11 +2078,32 @@ const HolderViewer = forwardRef<
     });
     controls.addEventListener("change", handleControlChange);
 
-    scene.add(new THREE.HemisphereLight("#ffffff", "#aeb7c4", 2.1));
-    const keyLight = new THREE.DirectionalLight("#ffffff", 2.4);
+    scene.add(
+      new THREE.HemisphereLight(
+        "#ffffff",
+        "#aeb7c4",
+        useDetailedLighting ? 0.82 : 2.1,
+      ),
+    );
+    const keyLight = new THREE.DirectionalLight(
+      "#ffffff",
+      useDetailedLighting ? 1.45 : 2.4,
+    );
     keyLight.position.set(180, -160, 260);
+    keyLight.castShadow = renderQuality !== "standard";
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.near = 20;
+    keyLight.shadow.camera.far = 900;
+    keyLight.shadow.camera.left = -320;
+    keyLight.shadow.camera.right = 320;
+    keyLight.shadow.camera.top = 320;
+    keyLight.shadow.camera.bottom = -320;
+    keyLight.shadow.bias = -0.0002;
     scene.add(keyLight);
-    const fillLight = new THREE.DirectionalLight("#dbeafe", 0.78);
+    const fillLight = new THREE.DirectionalLight(
+      "#dbeafe",
+      useDetailedLighting ? 0.34 : 0.78,
+    );
     fillLight.position.set(-220, 140, 120);
     scene.add(fillLight);
 
@@ -2010,6 +2123,20 @@ const HolderViewer = forwardRef<
     grid.rotation.x = Math.PI / 2;
     grid.position.z = -0.2;
     scene.add(grid);
+
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(gridSize, gridSize),
+      new THREE.MeshStandardMaterial({
+        color: theme === "dark" ? "#15191f" : "#ece9e2",
+        roughness: 0.92,
+        metalness: 0,
+      }),
+    );
+    floor.name = "studio-floor";
+    floor.position.z = -0.24;
+    floor.receiveShadow = true;
+    floor.visible = renderQuality !== "standard";
+    scene.add(floor);
 
     const initialParams = latestParamsRef.current;
     const guideGeometry =
@@ -2047,7 +2174,7 @@ const HolderViewer = forwardRef<
 
     loader
       .loadAsync(model.stl.url)
-      .then((mainGeometry) => {
+      .then(async (mainGeometry) => {
         if (disposed) {
           mainGeometry.dispose();
           return;
@@ -2060,29 +2187,50 @@ const HolderViewer = forwardRef<
         mainBaseRef.current = normalizedMain.basePositions;
 
         const woodSpecies = getWoodSpeciesForModel(model.id);
+        const useDetailedOak =
+          model.id === "whisperer" && renderQuality !== "standard";
+        if (useDetailedOak) {
+          try {
+            oakAssets = await loadOakRenderingAssets(renderer);
+            if (disposed) {
+              oakAssets.dispose();
+              oakAssets = null;
+              mainGeometry.dispose();
+              normalizedMain.geometry.dispose();
+              return;
+            }
+            scene.environment = oakAssets.environment;
+            scene.environmentIntensity = 0.78;
+          } catch (error) {
+            console.warn("Unable to load detailed oak rendering assets", error);
+          }
+        }
         const woodTexture = woodSpecies
-          ? createWoodTexture(renderer, woodSpecies)
+          ? oakAssets
+            ? null
+            : createWoodTexture(renderer, woodSpecies)
           : null;
         const isWoodFurniture = woodSpecies !== null;
-        const mainMaterial = new THREE.MeshStandardMaterial({
-          color:
-            isWoodFurniture
-              ? "#ffffff"
-              : model.viewer !== "weighted-paper-towel-holder-v1"
-                ? "#d8dee9"
-                : theme === "dark"
-                  ? "#202734"
-                  : "#111318",
-          map: woodTexture,
-          roughness:
-            model.viewer === "hover-dining-table-v1"
-              ? 0.62
-              : model.viewer === "dining-table-v1"
-                ? 0.72
-                : 0.78,
-          metalness: isWoodFurniture ? 0 : 0.08,
-          side: THREE.DoubleSide,
-        });
+        const mainMaterial = oakAssets?.material ??
+          new THREE.MeshStandardMaterial({
+            color:
+              isWoodFurniture
+                ? "#ffffff"
+                : model.viewer !== "weighted-paper-towel-holder-v1"
+                  ? "#d8dee9"
+                  : theme === "dark"
+                    ? "#202734"
+                    : "#111318",
+            map: woodTexture,
+            roughness:
+              model.viewer === "hover-dining-table-v1"
+                ? 0.62
+                : model.viewer === "dining-table-v1"
+                  ? 0.72
+                  : 0.78,
+            metalness: isWoodFurniture ? 0 : 0.08,
+            side: THREE.DoubleSide,
+          });
         mainMaterialRef.current = mainMaterial;
         const domeMaterial = new THREE.MeshStandardMaterial({
           color: "#111318",
@@ -2124,6 +2272,8 @@ const HolderViewer = forwardRef<
             : normalizedMain.geometry;
         const mainMesh = new THREE.Mesh(displayedGeometry, mainMaterial);
         mainMesh.name = `${model.id}-adjustable-body`;
+        mainMesh.castShadow = renderQuality !== "standard";
+        mainMesh.receiveShadow = renderQuality !== "standard";
         scene.add(mainMesh);
         mainMeshRef.current = mainMesh;
 
@@ -2222,6 +2372,18 @@ const HolderViewer = forwardRef<
           hoverExplodedGroupRef.current = explodedGroup;
         }
 
+        for (const group of [
+          diningHardwareGroupRef.current,
+          hoverHardwareGroupRef.current,
+        ]) {
+          group?.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+              object.castShadow = renderQuality !== "standard";
+              object.receiveShadow = renderQuality !== "standard";
+            }
+          });
+        }
+
         const ghostMesh = new THREE.Mesh(
           normalizedMain.geometry.clone(),
           ghostMaterial,
@@ -2241,6 +2403,26 @@ const HolderViewer = forwardRef<
 
         updateMeshes();
         resetCamera();
+
+        if (renderQuality === "photo" && oakAssets) {
+          const { WebGLPathTracer: PathTracer } = await import(
+            "three-gpu-pathtracer"
+          );
+          if (disposed) {
+            mainGeometry.dispose();
+            return;
+          }
+          pathTracer = new PathTracer(renderer);
+          pathTracerRef.current = pathTracer;
+          pathTracer.bounces = 4;
+          pathTracer.minSamples = 16;
+          pathTracer.renderDelay = 160;
+          pathTracer.fadeDuration = 900;
+          pathTracer.dynamicLowRes = false;
+          pathTracer.renderScale = 0.5;
+          pathTracer.tiles.set(1, 1);
+          pathTracer.setScene(scene, camera);
+        }
 
         mainGeometry.dispose();
       })
@@ -2265,7 +2447,11 @@ const HolderViewer = forwardRef<
     const animate = () => {
       animationRef.current = requestAnimationFrame(animate);
       controls.update();
-      renderer.render(scene, camera);
+      if (pathTracer) {
+        pathTracer.renderSample();
+      } else {
+        renderer.render(scene, camera);
+      }
     };
     animate();
 
@@ -2273,6 +2459,15 @@ const HolderViewer = forwardRef<
       disposed = true;
       if (animationRef.current !== null) {
         cancelAnimationFrame(animationRef.current);
+      }
+      if (pathTracerRefreshRef.current !== null) {
+        window.clearTimeout(pathTracerRefreshRef.current);
+        pathTracerRefreshRef.current = null;
+      }
+      pathTracerRef.current = null;
+      if (pathTracer) {
+        disposePathTracer(pathTracer);
+        pathTracer = null;
       }
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener("wheel", handleTrackpadPan, true);
@@ -2289,10 +2484,11 @@ const HolderViewer = forwardRef<
           }
         }
       });
+      oakAssets?.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [model, resetCamera, updateCubeOrientation, updateMeshes]);
+  }, [model, renderQuality, resetCamera, theme, updateCubeOrientation, updateMeshes]);
 
   useEffect(() => {
     latestInteractionModeRef.current = interactionMode;
@@ -2354,6 +2550,9 @@ const HolderViewer = forwardRef<
           <span key={item}>{item}</span>
         ))}
         <span>{RENDER_MODE_LABELS[renderMode]}</span>
+        {model.id === "whisperer" ? (
+          <span>{RENDER_QUALITY_LABELS[renderQuality]} render</span>
+        ) : null}
         {model.viewer === "hover-dining-table-v1" &&
         assemblyMode === "exploded" ? (
           <span>Exploded · {getHoverDiningTablePieceCount(params)} pieces</span>
@@ -3273,6 +3472,43 @@ function RenderModeControl({
           {option.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+function RenderQualityControl({
+  value,
+  onChange,
+}: {
+  value: RenderQuality;
+  onChange: (value: RenderQuality) => void;
+}) {
+  const options = Object.entries(RENDER_QUALITY_LABELS) as Array<
+    [RenderQuality, string]
+  >;
+
+  return (
+    <div className="render-quality-control">
+      <span className="workspace-menu-label">Quality</span>
+      <div className="segmented-control" aria-label="Rendering quality">
+        {options.map(([option, label]) => (
+          <button
+            className={value === option ? "active" : ""}
+            key={option}
+            onClick={() => onChange(option)}
+            type="button"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <small>
+        {value === "standard"
+          ? "Fast procedural oak"
+          : value === "high"
+            ? "2K oak PBR and studio lighting"
+            : "Progressive path-traced oak"}
+      </small>
     </div>
   );
 }
@@ -4504,6 +4740,7 @@ function WorkspaceActionsMenu({
   model,
   params,
   renderMode,
+  renderQuality,
   showOriginal,
   theme,
   unit,
@@ -4513,6 +4750,7 @@ function WorkspaceActionsMenu({
   onExportBoxAndLid,
   onExportHoverTemplates,
   onRenderModeChange,
+  onRenderQualityChange,
   onSavedVersion,
   onShowOriginalChange,
   onThemeChange,
@@ -4523,6 +4761,7 @@ function WorkspaceActionsMenu({
   model: ModelDefinition;
   params: ModelParams;
   renderMode: RenderMode;
+  renderQuality: RenderQuality;
   showOriginal: boolean;
   theme: ThemeMode;
   unit: LengthUnit;
@@ -4532,6 +4771,7 @@ function WorkspaceActionsMenu({
   onExportBoxAndLid: () => void;
   onExportHoverTemplates: () => void;
   onRenderModeChange: (renderMode: RenderMode) => void;
+  onRenderQualityChange: (renderQuality: RenderQuality) => void;
   onSavedVersion: (versionId: Id<"versions">, title: string) => void;
   onShowOriginalChange: (checked: boolean) => void;
   onThemeChange: (theme: ThemeMode) => void;
@@ -4609,6 +4849,12 @@ function WorkspaceActionsMenu({
                 onChange={onRenderModeChange}
                 value={renderMode}
               />
+              {model.id === "whisperer" ? (
+                <RenderQualityControl
+                  onChange={onRenderQualityChange}
+                  value={renderQuality}
+                />
+              ) : null}
               {model.viewer !== "dining-table-v1" &&
               model.viewer !== "hover-dining-table-v1" ? (
                 <OriginalOverlayToggle
@@ -4665,6 +4911,7 @@ function WorkspaceHeader({
   model,
   params,
   renderMode,
+  renderQuality,
   showOriginal,
   theme,
   unit,
@@ -4674,6 +4921,7 @@ function WorkspaceHeader({
   onExportBoxAndLid,
   onExportHoverTemplates,
   onRenderModeChange,
+  onRenderQualityChange,
   onSavedVersion,
   onShowOriginalChange,
   onThemeChange,
@@ -4687,6 +4935,7 @@ function WorkspaceHeader({
   model: ModelDefinition;
   params: ModelParams;
   renderMode: RenderMode;
+  renderQuality: RenderQuality;
   showOriginal: boolean;
   theme: ThemeMode;
   unit: LengthUnit;
@@ -4696,6 +4945,7 @@ function WorkspaceHeader({
   onExportBoxAndLid: () => void;
   onExportHoverTemplates: () => void;
   onRenderModeChange: (renderMode: RenderMode) => void;
+  onRenderQualityChange: (renderQuality: RenderQuality) => void;
   onSavedVersion: (versionId: Id<"versions">, title: string) => void;
   onShowOriginalChange: (checked: boolean) => void;
   onThemeChange: (theme: ThemeMode) => void;
@@ -4733,11 +4983,13 @@ function WorkspaceHeader({
           onExportBoxAndLid={onExportBoxAndLid}
           onExportHoverTemplates={onExportHoverTemplates}
           onRenderModeChange={onRenderModeChange}
+          onRenderQualityChange={onRenderQualityChange}
           onSavedVersion={onSavedVersion}
           onShowOriginalChange={onShowOriginalChange}
           onThemeChange={onThemeChange}
           params={params}
           renderMode={renderMode}
+          renderQuality={renderQuality}
           showOriginal={showOriginal}
           theme={theme}
           unit={unit}
@@ -4786,6 +5038,8 @@ export default function App({
     useState<MobileInspectorSection>("assembly");
   const [coreViewMode, setCoreViewMode] = useState<CoreViewMode>("surface");
   const [renderMode, setRenderMode] = useState<RenderMode>("solid");
+  const [renderQuality, setRenderQuality] =
+    useState<RenderQuality>("standard");
   const [showOriginal, setShowOriginal] = useState(false);
   const [activeVersionId, setActiveVersionId] = useState<Id<"versions"> | null>(
     null,
@@ -4913,6 +5167,11 @@ export default function App({
         setShowOriginal(false);
         setCoreViewMode("surface");
         setRenderMode("solid");
+        setRenderQuality(
+          nextModel.id === "whisperer"
+            ? getRequestedRenderQuality()
+            : "standard",
+        );
         brochureAbortRef.current?.abort();
         setBrochureState({ status: "idle" });
         setAssemblyMode(
@@ -4967,9 +5226,10 @@ export default function App({
     writeUrlState({
       modelId: selectedModelId,
       params,
+      renderQuality,
       unit,
     });
-  }, [model, params, selectedModelId, unit]);
+  }, [model, params, renderQuality, selectedModelId, unit]);
 
   useEffect(() => {
     const generationId = new URLSearchParams(window.location.search).get(
@@ -5606,12 +5866,14 @@ export default function App({
           viewerRef.current?.exportHoverTemplateStls()
         }
         onRenderModeChange={setRenderMode}
+        onRenderQualityChange={setRenderQuality}
         onSavedVersion={handleSavedVersion}
         onShowOriginalChange={setShowOriginal}
         onThemeChange={updateTheme}
         onOpenNavigation={() => setIsCompactLibraryOpen(true)}
         params={params}
         renderMode={renderMode}
+        renderQuality={renderQuality}
         showNavigationTrigger={isCompactWorkspace}
         showOriginal={showOriginal}
         theme={theme}
@@ -5720,6 +5982,7 @@ export default function App({
             params={params}
             ref={viewerRef}
             renderMode={renderMode}
+            renderQuality={renderQuality}
             showOriginal={showOriginal}
             theme={theme}
             unit={unit}

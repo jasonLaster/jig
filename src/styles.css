@@ -1040,6 +1040,20 @@ html.dark .model-preview.holder span {
   margin-top: 4px;
 }
 
+.render-quality-control {
+  display: grid;
+  gap: 7px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.render-quality-control small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .workspace-menu-group .primary-action,
 .version-modal-actions .primary-action {
   justify-content: center;
