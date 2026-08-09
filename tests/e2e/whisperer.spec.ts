@@ -2,6 +2,7 @@ import { expect, test, type Download } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import * as THREE from "three";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import {
   createDiningTableHardwareGeometries,
@@ -11,6 +12,7 @@ import {
 import { getDefaultParams } from "../../src/models/shared";
 import type { DiningTableModelDefinition } from "../../src/models/types";
 import { getWoodSpeciesForModel } from "../../src/woodTexture";
+import { assignDirectionalWoodUvs } from "../../src/models/woodGrainUvs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const model = JSON.parse(
@@ -20,6 +22,66 @@ const model = JSON.parse(
 test("classifies the Whisperer as solid oak across its model surfaces", () => {
   expect(getWoodSpeciesForModel(model.id)).toBe("oak");
   expect(model.description).toContain("solid-oak");
+});
+
+test("maps oak grain along every Whisperer wood member", () => {
+  const geometry = createDiningTableWoodGeometry(getDefaultParams(model), model);
+  const parts = geometry.userData.woodGrainParts as Array<{
+    direction: [number, number, number];
+    name: string;
+    vertexCount: number;
+    vertexStart: number;
+  }>;
+
+  expect(parts.map((part) => part.name)).toEqual([
+    "tabletop",
+    "leg-left-front",
+    "leg-left-rear",
+    "leg-right-front",
+    "leg-right-rear",
+    "long-apron-front",
+    "long-apron-rear",
+    "side-apron-left",
+    "side-apron-right",
+  ]);
+  expect(parts[0].direction).toEqual([1, 0, 0]);
+  for (const leg of parts.slice(1, 5)) {
+    expect(Math.abs(leg.direction[0])).toBeGreaterThan(0);
+    expect(leg.direction[1]).toBeCloseTo(0, 8);
+    expect(leg.direction[2]).toBeGreaterThan(0.9);
+  }
+  for (const apron of parts.slice(5, 7)) {
+    expect(apron.direction).toEqual([1, 0, 0]);
+  }
+  for (const apron of parts.slice(7, 9)) {
+    expect(apron.direction).toEqual([0, -1, 0]);
+  }
+  expect(
+    parts.reduce((count, part) => count + part.vertexCount, 0),
+  ).toBe(geometry.getAttribute("position").count);
+  expect(parts.at(-1)!.vertexStart + parts.at(-1)!.vertexCount).toBe(
+    geometry.getAttribute("position").count,
+  );
+
+  const sample = new THREE.BoxGeometry(10, 6, 4).toNonIndexed();
+  assignDirectionalWoodUvs(sample, new THREE.Vector3(1, 0, 0), 10);
+  const position = sample.getAttribute("position");
+  const normal = sample.getAttribute("normal");
+  const uv = sample.getAttribute("uv");
+  for (let index = 0; index < position.count; index += 1) {
+    expect(Number.isFinite(uv.getX(index))).toBe(true);
+    expect(Number.isFinite(uv.getY(index))).toBe(true);
+    if (Math.abs(normal.getZ(index)) > 0.99) {
+      expect(uv.getX(index)).toBeCloseTo(position.getX(index) / 10, 6);
+      expect(Math.abs(uv.getY(index))).toBeCloseTo(
+        Math.abs(position.getY(index) / 10),
+        6,
+      );
+    }
+  }
+
+  sample.dispose();
+  geometry.dispose();
 });
 
 test("builds the Whisperer on four independent leveling feet", () => {

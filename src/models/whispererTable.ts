@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { formatLength } from "../units";
 import { getParam, getParameter } from "./shared";
+import { assignDirectionalWoodUvs } from "./woodGrainUvs";
 import type {
   AuditCheckDefinition,
   AuditItem,
@@ -36,39 +37,11 @@ function addTriangle(
   positions.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
 }
 
-function assignPlanarUvs(geometry: THREE.BufferGeometry) {
-  geometry.computeVertexNormals();
-  geometry.computeBoundingBox();
-  const position = geometry.getAttribute("position");
-  const normal = geometry.getAttribute("normal");
-  const bounds = geometry.boundingBox;
-  if (!bounds) return;
-
-  const size = new THREE.Vector3();
-  bounds.getSize(size);
-  const uvs = new Float32Array(position.count * 2);
-  for (let index = 0; index < position.count; index += 1) {
-    const x = position.getX(index);
-    const y = position.getY(index);
-    const z = position.getZ(index);
-    const nx = Math.abs(normal.getX(index));
-    const ny = Math.abs(normal.getY(index));
-    const nz = Math.abs(normal.getZ(index));
-    if (nz >= nx && nz >= ny) {
-      uvs[index * 2] = (x - bounds.min.x) / Math.max(size.x, EPSILON);
-      uvs[index * 2 + 1] = (y - bounds.min.y) / Math.max(size.y, EPSILON);
-    } else if (nx >= ny) {
-      uvs[index * 2] = (y - bounds.min.y) / Math.max(size.y, EPSILON);
-      uvs[index * 2 + 1] = (z - bounds.min.z) / Math.max(size.z, EPSILON);
-    } else {
-      uvs[index * 2] = (x - bounds.min.x) / Math.max(size.x, EPSILON);
-      uvs[index * 2 + 1] = (z - bounds.min.z) / Math.max(size.z, EPSILON);
-    }
-  }
-  geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
-}
-
-function createLoftGeometry(layers: LoftLayer[]) {
+function createLoftGeometry(
+  layers: LoftLayer[],
+  grainDirection: THREE.Vector3,
+  textureSize: number,
+) {
   if (layers.length < 2) throw new Error("A loft requires at least two layers");
   const pointCount = layers[0].points.length;
   if (
@@ -127,7 +100,7 @@ function createLoftGeometry(layers: LoftLayer[]) {
     "position",
     new THREE.Float32BufferAttribute(positions, 3),
   );
-  assignPlanarUvs(geometry);
+  assignDirectionalWoodUvs(geometry, grainDirection, textureSize);
   geometry.computeBoundingSphere();
   return geometry;
 }
@@ -166,7 +139,11 @@ function chamferedRectanglePoints(
   ];
 }
 
-function createPrismAlongX(length: number, crossSection: THREE.Vector2[]) {
+function createPrismAlongX(
+  length: number,
+  crossSection: THREE.Vector2[],
+  textureSize: number,
+) {
   const positions: number[] = [];
   const xMin = -length / 2;
   const xMax = length / 2;
@@ -202,19 +179,32 @@ function createPrismAlongX(length: number, crossSection: THREE.Vector2[]) {
     "position",
     new THREE.Float32BufferAttribute(positions, 3),
   );
-  assignPlanarUvs(geometry);
+  assignDirectionalWoodUvs(
+    geometry,
+    new THREE.Vector3(1, 0, 0),
+    textureSize,
+  );
   geometry.computeBoundingSphere();
   return geometry;
 }
 
-function createPrismAlongY(length: number, crossSection: THREE.Vector2[]) {
-  const alongX = createPrismAlongX(length, crossSection);
+function createPrismAlongY(
+  length: number,
+  crossSection: THREE.Vector2[],
+  textureSize: number,
+) {
+  const alongX = createPrismAlongX(length, crossSection, textureSize);
   alongX.rotateZ(-Math.PI / 2);
+  alongX.userData.woodGrainDirection = [0, -1, 0];
   return alongX;
 }
 
 function scaled(params: ModelParams, key: string) {
   return getParam(params, key) / getParam(params, "mockScale");
+}
+
+function grainTextureSize(params: ModelParams) {
+  return 800 / getParam(params, "mockScale");
 }
 
 function getWhispererTopBottom(params: ModelParams) {
@@ -251,20 +241,24 @@ function createWhispererTopGeometry(params: ModelParams) {
   const topBottom = getWhispererTopBottom(params);
   const innerLength = length - bevelInset * 2;
   const innerWidth = width - bevelInset * 2;
-  return createLoftGeometry([
-    {
-      z: topBottom,
-      points: rectanglePoints(innerLength, innerWidth),
-    },
-    {
-      z: topBottom + thickness - edgeThickness,
-      points: rectanglePoints(length, width),
-    },
-    {
-      z: topBottom + thickness,
-      points: rectanglePoints(length, width),
-    },
-  ]);
+  return createLoftGeometry(
+    [
+      {
+        z: topBottom,
+        points: rectanglePoints(innerLength, innerWidth),
+      },
+      {
+        z: topBottom + thickness - edgeThickness,
+        points: rectanglePoints(length, width),
+      },
+      {
+        z: topBottom + thickness,
+        points: rectanglePoints(length, width),
+      },
+    ],
+    new THREE.Vector3(1, 0, 0),
+    grainTextureSize(params),
+  );
 }
 
 function createWhispererLegGeometry(
@@ -283,24 +277,28 @@ function createWhispererLegGeometry(
     topCenterX + xSign * height * Math.tan(LEG_SPLAY_RADIANS);
   const centerY = ySign * scaled(params, "sideApronLength") / 2;
 
-  return createLoftGeometry([
-    {
-      z: woodBottom,
-      centerX: bottomCenterX,
-      centerY,
-      points: chamferedRectanglePoints(
-        footWidth,
-        thickness,
-        footChamfer,
-      ),
-    },
-    {
-      z: woodBottom + height,
-      centerX: topCenterX,
-      centerY,
-      points: chamferedRectanglePoints(topWidth, thickness, EPSILON),
-    },
-  ]);
+  return createLoftGeometry(
+    [
+      {
+        z: woodBottom,
+        centerX: bottomCenterX,
+        centerY,
+        points: chamferedRectanglePoints(
+          footWidth,
+          thickness,
+          footChamfer,
+        ),
+      },
+      {
+        z: woodBottom + height,
+        centerX: topCenterX,
+        centerY,
+        points: chamferedRectanglePoints(topWidth, thickness, EPSILON),
+      },
+    ],
+    new THREE.Vector3(topCenterX - bottomCenterX, 0, height),
+    grainTextureSize(params),
+  );
 }
 
 function apronCrossSection(depth: number, height: number, chamferRise: number) {
@@ -327,6 +325,7 @@ function createLongApronGeometry(params: ModelParams, ySign: -1 | 1) {
   const geometry = createPrismAlongX(
     length,
     apronCrossSection(thickness, height, thickness / 2),
+    grainTextureSize(params),
   );
   geometry.translate(0, y, getWhispererTopBottom(params) - height);
   return geometry;
@@ -355,7 +354,11 @@ function createSideApronGeometry(params: ModelParams, xSign: -1 | 1) {
         point.y,
       ),
   );
-  const geometry = createPrismAlongY(length, crossSection);
+  const geometry = createPrismAlongY(
+    length,
+    crossSection,
+    grainTextureSize(params),
+  );
   geometry.translate(topCenter, 0, getWhispererTopBottom(params) - height);
   return geometry;
 }
@@ -804,6 +807,17 @@ export function getWhispererTableStructuralAssessment(
 }
 
 export function createWhispererTableWoodGeometry(params: ModelParams) {
+  const partNames = [
+    "tabletop",
+    "leg-left-front",
+    "leg-left-rear",
+    "leg-right-front",
+    "leg-right-rear",
+    "long-apron-front",
+    "long-apron-rear",
+    "side-apron-left",
+    "side-apron-right",
+  ] as const;
   const geometries = [
     createWhispererTopGeometry(params),
     createWhispererLegGeometry(params, -1, -1),
@@ -816,8 +830,21 @@ export function createWhispererTableWoodGeometry(params: ModelParams) {
     createSideApronGeometry(params, 1),
   ];
   const merged = mergeGeometries(geometries, false);
+  let vertexStart = 0;
+  const woodGrainParts = geometries.map((geometry, index) => {
+    const vertexCount = geometry.getAttribute("position").count;
+    const part = {
+      direction: geometry.userData.woodGrainDirection as [number, number, number],
+      name: partNames[index],
+      vertexCount,
+      vertexStart,
+    };
+    vertexStart += vertexCount;
+    return part;
+  });
   geometries.forEach((geometry) => geometry.dispose());
   if (!merged) throw new Error("Unable to merge Whisperer table geometry");
+  merged.userData.woodGrainParts = woodGrainParts;
   merged.computeBoundingBox();
   merged.computeBoundingSphere();
   return merged;

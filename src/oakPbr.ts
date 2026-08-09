@@ -2,10 +2,10 @@ import * as THREE from "three";
 import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 
 const OAK_BASE_COLOR_URL =
-  "/materials/oak-veneer-01/base-color.webp";
-const OAK_NORMAL_URL = "/materials/oak-veneer-01/normal-gl.webp";
+  "/materials/plain-oak-049/base-color.webp";
+const OAK_NORMAL_URL = "/materials/plain-oak-049/normal-gl.webp";
 const OAK_ROUGHNESS_URL =
-  "/materials/oak-veneer-01/roughness.webp";
+  "/materials/plain-oak-049/roughness.webp";
 const STUDIO_ENVIRONMENT_URL =
   "/environments/studio-small-08/studio-small-08.hdr";
 
@@ -46,15 +46,15 @@ export async function loadOakRenderingAssets(
   environment.mapping = THREE.EquirectangularReflectionMapping;
 
   const material = new THREE.MeshPhysicalMaterial({
-    color: "#ffffff",
+    color: new THREE.Color().setRGB(1.14, 1.08, 1),
     map: baseColor,
     normalMap: normal,
-    normalScale: new THREE.Vector2(0.52, 0.52),
+    normalScale: new THREE.Vector2(0.34, 0.34),
     roughnessMap: roughness,
-    roughness: 0.78,
+    roughness: 0.74,
     metalness: 0,
-    clearcoat: 0.12,
-    clearcoatRoughness: 0.58,
+    clearcoat: 0.08,
+    clearcoatRoughness: 0.64,
     envMapIntensity: 1.05,
     side: THREE.DoubleSide,
   });
