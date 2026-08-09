@@ -16,6 +16,19 @@ const SUPPORTED_MODEL_IDS = new Set([
   "whisperer",
 ]);
 
+export const BROCHURE_ASSET_SPECS = [
+  { kind: "room-hero", label: "Room · hero" },
+  { kind: "room-alternate", label: "Room · alternate" },
+  { kind: "table-three-quarter", label: "Table · three-quarter" },
+  { kind: "table-profile", label: "Table · profile" },
+] as const;
+export type BrochureAssetKind = (typeof BROCHURE_ASSET_SPECS)[number]["kind"];
+
+type BrochureUpload = {
+  kind: BrochureAssetKind;
+  url: string;
+};
+
 type BrochureRequest = {
   clientId: string;
   generationId: string;
@@ -28,6 +41,8 @@ type BrochureRequest = {
   images: string[];
   modelId: string;
   modelName: string;
+  assetSet?: boolean;
+  uploads?: BrochureUpload[];
 };
 
 function json(value: unknown, status = 200, headers?: HeadersInit) {
@@ -45,6 +60,21 @@ function isFinitePositive(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
+function isConvexUploadUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      url.hostname.endsWith(".convex.cloud") &&
+      url.pathname === "/api/storage/upload" &&
+      url.searchParams.has("token")
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function parseRequest(value: unknown): BrochureRequest | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<BrochureRequest>;
@@ -52,6 +82,16 @@ export function parseRequest(value: unknown): BrochureRequest | null {
     candidate.generationId === undefined
       ? globalThis.crypto.randomUUID()
       : candidate.generationId;
+  const uploads = candidate.uploads;
+  const uploadsAreValid =
+    uploads === undefined ||
+    (Array.isArray(uploads) &&
+      uploads.length === BROCHURE_ASSET_SPECS.length &&
+      BROCHURE_ASSET_SPECS.every(
+        (spec, index) =>
+          uploads[index]?.kind === spec.kind &&
+          isConvexUploadUrl(uploads[index]?.url),
+      ));
   if (
     typeof candidate.modelId !== "string" ||
     !SUPPORTED_MODEL_IDS.has(candidate.modelId) ||
@@ -61,6 +101,8 @@ export function parseRequest(value: unknown): BrochureRequest | null {
     !/^[a-zA-Z0-9-]{8,64}$/.test(candidate.clientId) ||
     typeof generationId !== "string" ||
     !/^[a-zA-Z0-9-]{20,64}$/.test(generationId) ||
+    (candidate.assetSet !== undefined && candidate.assetSet !== true) ||
+    !uploadsAreValid ||
     !Array.isArray(candidate.images) ||
     candidate.images.length !== MAX_REFERENCE_COUNT ||
     !candidate.dimensions ||
@@ -92,7 +134,10 @@ function inches(millimeters: number) {
   return (millimeters / 25.4).toFixed(3).replace(/\.0+$/, "");
 }
 
-export function buildBrochurePrompt(request: BrochureRequest) {
+export function buildBrochurePrompt(
+  request: BrochureRequest,
+  assetKind: BrochureAssetKind = "room-hero",
+) {
   const { dimensions } = request;
   const geometryInstructions = (() => {
     switch (request.modelId) {
@@ -110,15 +155,81 @@ Avoid: slab-like vertical tabletop edges, straight or cylindrical legs, missing 
 Avoid: live edge, thick slab top, rounded plan corners, four independent legs, central box stretcher, missing or extra diagonals, altered proportions, warped wide-angle perspective, rustic farmhouse styling.`;
     }
   })();
+  const compositionInstructions: Record<BrochureAssetKind, string> = {
+    "room-hero":
+      "Scene/backdrop: warm contemporary dining room with ivory limewash walls, pale limestone floor, linen-curtained windows, restrained artwork, and a sculptural pendant. Add exactly six slim pale-oak dining chairs with woven natural seats: four long-side chairs neatly tucked under the tabletop and one chair at each short end slightly pulled out. Keep the base readable through the chairs. Composition/framing: generous eye-level three-quarter hero view showing the full table and all six chairs in a 3:2 landscape catalog photograph.",
+    "room-alternate":
+      "Scene/backdrop: the same warm contemporary dining-room language—ivory limewash, pale limestone, linen curtains, restrained artwork, and a sculptural pendant—but photographed from the opposite diagonal. Add exactly six slim pale-oak dining chairs with woven natural seats: four long-side chairs neatly tucked under the tabletop and one chair at each short end slightly pulled out. Keep the base readable through the chairs. Composition/framing: a distinct wider architectural perspective that shows the full table, chair layout, and room context without repeating the hero camera angle.",
+    "table-three-quarter":
+      "Scene/backdrop: seamless warm-white photography cyclorama with a pale neutral floor and no room architecture. Subject: the table alone—no chairs, people, props, or tabletop objects. Composition/framing: full-object eye-level three-quarter product photograph with comfortable margin around every edge, revealing the top, base geometry, supports, and feet.",
+    "table-profile":
+      "Scene/backdrop: seamless warm-white photography cyclorama with a pale neutral floor and no room architecture. Subject: the table alone—no chairs, people, props, or tabletop objects. Composition/framing: full-object long-side profile with only a slight elevated three-quarter offset to reveal tabletop thickness and support connections while preserving near-orthographic proportions.",
+  };
   return `Use case: product-mockup
-Asset type: premium furniture brochure hero photograph
-Primary request: Reconstruct one exact ${request.modelName} from the four supplied CAD views, then place that unchanged table in a serene contemporary dining room. The four images are equal-priority geometry references of the same object, not design variations.
+Asset type: one image in a coordinated premium furniture brochure set
+Primary request: Reconstruct one exact ${request.modelName} from the four supplied CAD views. The four images are equal-priority geometry references of the same object, not design variations. Produce only the requested single photograph, not a collage or contact sheet.
 Exact dimensions: ${inches(dimensions.length)} in long × ${inches(dimensions.width)} in wide × ${inches(dimensions.height)} in high; tabletop thickness ${inches(dimensions.topThickness)} in. Preserve the resulting length-to-width ratio, tabletop overhangs, and member scale.
 ${geometryInstructions}
-Scene: warm contemporary dining room with ivory limewash walls, pale limestone floor, linen-curtained windows, restrained artwork, and a sculptural pendant. Add exactly six slim pale-oak dining chairs with woven natural seats: four long-side chairs neatly tucked under the tabletop and one chair at each short end slightly pulled out. Keep the base readable through the chairs. No people and nothing on the tabletop.
-Style: ultra-photorealistic architectural interiors photography, premium European furniture catalog, natural late-morning light, physically plausible contact shadows, 3:2 landscape composition, high material fidelity.
+${compositionInstructions[assetKind]}
+Style: ultra-photorealistic premium European furniture catalog photography, natural late-morning light, physically plausible contact shadows, 3:2 landscape composition, high material fidelity.
 Constraints: every visible table dimension, member count, connection point, edge profile, frame, support member, and foot must match the CAD references. Do not add or remove structural members or hardware. No decor on the tabletop, typography, logo, or watermark.
 `;
+}
+
+async function generateBrochureAsset(
+  request: BrochureRequest,
+  references: Uint8Array[],
+  assetKind: BrochureAssetKind,
+) {
+  const result = await generateImage({
+    model: gateway.image(IMAGE_MODEL),
+    prompt: {
+      text: buildBrochurePrompt(request, assetKind),
+      images: references,
+    },
+    size: "1536x1024",
+    maxRetries: 1,
+    abortSignal: AbortSignal.timeout(52_000),
+    providerOptions: {
+      gateway: {
+        user: request.clientId,
+        tags: [
+          "feature:brochure",
+          `model:${request.modelId}`,
+          "prompt:v4",
+          `asset:${assetKind}`,
+          `generation:${request.generationId}`,
+        ],
+      },
+    },
+  });
+  return { assetKind, result };
+}
+
+async function uploadBrochureAsset(
+  upload: BrochureUpload,
+  generated: Awaited<ReturnType<typeof generateBrochureAsset>>,
+) {
+  const image = generated.result.image;
+  const imageBytes = new Uint8Array(image.uint8Array.byteLength);
+  imageBytes.set(image.uint8Array);
+  const response = await fetch(upload.url, {
+    method: "POST",
+    headers: { "content-type": image.mediaType },
+    body: new Blob([imageBytes.buffer], { type: image.mediaType }),
+  });
+  if (!response.ok) {
+    throw new Error(`Brochure image upload failed (${response.status}).`);
+  }
+  const payload = (await response.json()) as { storageId?: unknown };
+  if (typeof payload.storageId !== "string" || payload.storageId.length < 8) {
+    throw new Error("Brochure image upload returned an invalid storage ID.");
+  }
+  return {
+    kind: generated.assetKind,
+    storageId: payload.storageId,
+    mediaType: image.mediaType,
+  };
 }
 
 async function handleBrochureRequest(request: Request) {
@@ -158,27 +269,38 @@ async function handleBrochureRequest(request: Request) {
   }
 
   try {
-    const result = await generateImage({
-      model: gateway.image(IMAGE_MODEL),
-      prompt: {
-        text: buildBrochurePrompt(brochureRequest),
-        images: references,
-      },
-      size: "1536x1024",
-      maxRetries: 1,
-      abortSignal: AbortSignal.timeout(55_000),
-      providerOptions: {
-        gateway: {
-          user: brochureRequest.clientId,
-          tags: [
-            "feature:brochure",
-            `model:${brochureRequest.modelId}`,
-            "prompt:v3",
-            `generation:${brochureRequest.generationId}`,
-          ],
-        },
-      },
-    });
+    if (brochureRequest.assetSet) {
+      if (!brochureRequest.uploads) {
+        return json(
+          { error: "Brochure storage is required for the four-image set." },
+          503,
+        );
+      }
+      const generatedAssets = await Promise.all(
+        BROCHURE_ASSET_SPECS.map((spec) =>
+          generateBrochureAsset(brochureRequest, references, spec.kind),
+        ),
+      );
+      const assets = await Promise.all(
+        generatedAssets.map((generated, index) =>
+          uploadBrochureAsset(brochureRequest.uploads![index], generated),
+        ),
+      );
+      return json({
+        assets,
+        generationId: brochureRequest.generationId,
+        model: IMAGE_MODEL,
+        warnings: generatedAssets.flatMap(({ assetKind, result }) =>
+          result.warnings.map((warning) => `${assetKind}:${warning.type}`),
+        ),
+      });
+    }
+
+    const { result } = await generateBrochureAsset(
+      brochureRequest,
+      references,
+      "room-hero",
+    );
 
     return json({
       imageDataUrl: `data:${result.image.mediaType};base64,${result.image.base64}`,

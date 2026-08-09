@@ -171,7 +171,28 @@ export type BrochureDimensions = {
   width: number;
 };
 
+export const BROCHURE_ASSET_KINDS = [
+  "room-hero",
+  "room-alternate",
+  "table-three-quarter",
+  "table-profile",
+] as const;
+export type BrochureAssetKind = (typeof BROCHURE_ASSET_KINDS)[number];
+
+export type BrochureAsset = {
+  kind: BrochureAssetKind;
+  imageUrl: string;
+  mediaType: string;
+};
+
+export type StoredBrochureAsset = {
+  kind: BrochureAssetKind;
+  storageId: string;
+  mediaType: string;
+};
+
 export type SavedBrochure = {
+  assets: BrochureAsset[];
   generationId: string;
   imageUrl: string;
   modelKey: string;
@@ -191,17 +212,20 @@ type BrochureRecordInput = {
   params: ModelParams;
   promptVersion: string;
   referenceCount: number;
+  outputCount: number;
 };
 
 export type BrochurePersistence = {
   create: (input: BrochureRecordInput) => Promise<void>;
+  createUploadUrls: (
+    kinds: BrochureAssetKind[],
+  ) => Promise<Array<{ kind: BrochureAssetKind; url: string }>>;
   complete: (input: {
+    assets: StoredBrochureAsset[];
     clientId: string;
     generationId: string;
-    imageDataUrl: string;
-    mediaType: string;
     warnings: string[];
-  }) => Promise<{ imageUrl: string }>;
+  }) => Promise<{ assets: BrochureAsset[]; imageUrl: string }>;
   fail: (input: {
     clientId: string;
     errorMessage: string;
@@ -210,8 +234,7 @@ export type BrochurePersistence = {
 };
 
 type PendingBrochureSave = {
-  imageDataUrl: string;
-  mediaType: string;
+  assets: StoredBrochureAsset[];
   record: BrochureRecordInput;
   warnings: string[];
 };
@@ -858,6 +881,7 @@ async function requestDiningTableBrochure({
   model,
   params,
   signal,
+  uploads,
 }: {
   clientId: string;
   generationId: string;
@@ -865,12 +889,14 @@ async function requestDiningTableBrochure({
   model: ModelDefinition;
   params: ModelParams;
   signal: AbortSignal;
+  uploads?: Array<{ kind: BrochureAssetKind; url: string }>;
 }) {
   const response = await fetch("/api/brochure", {
     method: "POST",
     headers: { "content-type": "application/json" },
     signal,
     body: JSON.stringify({
+      assetSet: true,
       clientId,
       generationId,
       dimensions: {
@@ -882,10 +908,17 @@ async function requestDiningTableBrochure({
       images,
       modelId: model.id,
       modelName: model.name,
+      uploads,
     }),
   });
   const payload = (await response.json().catch(() => null)) as
     | {
+        assets?: Array<{
+          imageDataUrl?: string;
+          kind?: string;
+          mediaType?: string;
+          storageId?: string;
+        }>;
         error?: string;
         generationId?: string;
         imageDataUrl?: string;
@@ -898,17 +931,46 @@ async function requestDiningTableBrochure({
       payload?.error ?? `Brochure generation failed (${response.status}).`,
     );
   }
+  const responseAssets = payload?.assets;
+  const hasCompleteAssetSet =
+    Array.isArray(responseAssets) &&
+    responseAssets.length === BROCHURE_ASSET_KINDS.length &&
+    BROCHURE_ASSET_KINDS.every((kind, index) => {
+      const asset = responseAssets[index];
+      if (
+        asset?.kind !== kind ||
+        typeof asset.mediaType !== "string" ||
+        !asset.mediaType.startsWith("image/")
+      ) {
+        return false;
+      }
+      return uploads
+        ? typeof asset.storageId === "string" && asset.storageId.length >= 8
+        : typeof asset.imageDataUrl === "string" &&
+            asset.imageDataUrl.startsWith("data:image/");
+    });
+  const legacyAsset = !uploads && payload?.imageDataUrl?.startsWith("data:image/")
+    ? [
+        {
+          kind: "room-hero" as const,
+          imageDataUrl: payload.imageDataUrl,
+          mediaType: payload.imageDataUrl.slice(
+            5,
+            payload.imageDataUrl.indexOf(";"),
+          ),
+        },
+      ]
+    : null;
   if (
     payload?.generationId !== generationId ||
-    !payload.imageDataUrl?.startsWith("data:image/") ||
+    (!hasCompleteAssetSet && !legacyAsset) ||
     typeof payload.model !== "string" ||
     !Array.isArray(payload.warnings)
   ) {
     throw new Error("The brochure service returned an invalid image.");
   }
   return {
-    imageDataUrl: payload.imageDataUrl,
-    mediaType: payload.imageDataUrl.slice(5, payload.imageDataUrl.indexOf(";")),
+    assets: hasCompleteAssetSet ? responseAssets! : legacyAsset!,
     model: payload.model,
     warnings: payload.warnings,
   };
@@ -4284,7 +4346,8 @@ function WorkspaceSavedBrochures({
                   <strong>{formatWorkspaceVersionDate(brochure.createdAt)}</strong>
                   <small>
                     {(brochure.dimensions.length / 25.4).toFixed(0)} ×{" "}
-                    {(brochure.dimensions.width / 25.4).toFixed(1)} in
+                    {(brochure.dimensions.width / 25.4).toFixed(1)} in ·{" "}
+                    {brochure.assets.length} {brochure.assets.length === 1 ? "view" : "views"}
                   </small>
                 </span>
               </button>
@@ -4935,8 +4998,9 @@ export default function App({
     setAssemblyMode("brochure");
     setBrochureState({
       status: "success",
+      assets: brochure.assets,
+      dimensions: brochure.dimensions,
       generationId: brochure.generationId,
-      imageDataUrl: brochure.imageUrl,
       saved: true,
     });
   }, [model, savedBrochures]);
@@ -4987,11 +5051,15 @@ export default function App({
         modelKey: model.id,
         modelName: model.name,
         params,
-        promptVersion: "v3",
+        promptVersion: "v4",
         referenceCount: 4,
+        outputCount: BROCHURE_ASSET_KINDS.length,
       };
       try {
         await brochurePersistence?.create(record);
+        const uploads = await brochurePersistence?.createUploadUrls([
+          ...BROCHURE_ASSET_KINDS,
+        ]);
         await new Promise<void>((resolve) =>
           requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
         );
@@ -5003,35 +5071,44 @@ export default function App({
           model,
           params,
           signal: controller.signal,
+          uploads,
         });
-        const pendingSave: PendingBrochureSave = {
-          imageDataUrl: result.imageDataUrl,
-          mediaType: result.mediaType,
-          record: { ...record, imageModel: result.model },
-          warnings: result.warnings,
-        };
-        brochurePendingSaveRef.current = pendingSave;
         if (brochureRequestRef.current !== requestId) return;
 
         if (!brochurePersistence) {
+          const assets: BrochureAsset[] = result.assets.map((asset) => ({
+            kind: asset.kind as BrochureAssetKind,
+            imageUrl: asset.imageDataUrl!,
+            mediaType: asset.mediaType!,
+          }));
           setBrochureState({
             status: "success",
+            assets,
+            dimensions,
             generationId,
-            imageDataUrl: result.imageDataUrl,
             saved: false,
             saveError: "brochure storage is unavailable",
           });
           return;
         }
-        setBrochureState({
-          status: "saving",
-          imageDataUrl: result.imageDataUrl,
-        });
+        const storedAssets: StoredBrochureAsset[] = result.assets.map(
+          (asset) => ({
+            kind: asset.kind as BrochureAssetKind,
+            storageId: "storageId" in asset ? asset.storageId! : "",
+            mediaType: asset.mediaType!,
+          }),
+        );
+        const pendingSave: PendingBrochureSave = {
+          assets: storedAssets,
+          record: { ...record, imageModel: result.model },
+          warnings: result.warnings,
+        };
+        brochurePendingSaveRef.current = pendingSave;
+        setBrochureState({ status: "saving" });
         const saved = await brochurePersistence.complete({
+          assets: storedAssets,
           clientId: brochureClientId,
           generationId,
-          imageDataUrl: result.imageDataUrl,
-          mediaType: result.mediaType,
           warnings: result.warnings,
         });
         if (brochureRequestRef.current !== requestId) return;
@@ -5041,8 +5118,9 @@ export default function App({
         brochurePendingSaveRef.current = null;
         setBrochureState({
           status: "success",
+          assets: saved.assets,
+          dimensions,
           generationId,
-          imageDataUrl: saved.imageUrl,
           saved: true,
         });
       } catch (error) {
@@ -5055,11 +5133,9 @@ export default function App({
           const pendingSave = brochurePendingSaveRef.current;
           if (pendingSave?.record.generationId === generationId) {
             setBrochureState({
-              status: "success",
-              generationId,
-              imageDataUrl: pendingSave.imageDataUrl,
-              saved: false,
-              saveError: message,
+              status: "error",
+              message: `The images were created but could not be added to Brochures: ${message}`,
+              retrySave: true,
             });
           } else {
             setBrochureState({ status: "error", message });
@@ -5078,18 +5154,14 @@ export default function App({
     const pendingSave = brochurePendingSaveRef.current;
     if (!pendingSave || !brochurePersistence) return;
     const requestId = brochureRequestRef.current;
-    setBrochureState({
-      status: "saving",
-      imageDataUrl: pendingSave.imageDataUrl,
-    });
+    setBrochureState({ status: "saving" });
     void (async () => {
       try {
         await brochurePersistence.create(pendingSave.record);
         const saved = await brochurePersistence.complete({
+          assets: pendingSave.assets,
           clientId: brochureClientId,
           generationId: pendingSave.record.generationId,
-          imageDataUrl: pendingSave.imageDataUrl,
-          mediaType: pendingSave.mediaType,
           warnings: pendingSave.warnings,
         });
         if (brochureRequestRef.current !== requestId) return;
@@ -5099,19 +5171,18 @@ export default function App({
         brochurePendingSaveRef.current = null;
         setBrochureState({
           status: "success",
+          assets: saved.assets,
+          dimensions: pendingSave.record.dimensions,
           generationId: pendingSave.record.generationId,
-          imageDataUrl: saved.imageUrl,
           saved: true,
         });
       } catch (error) {
         if (brochureRequestRef.current !== requestId) return;
         setBrochureState({
-          status: "success",
-          generationId: pendingSave.record.generationId,
-          imageDataUrl: pendingSave.imageDataUrl,
-          saved: false,
-          saveError:
+          status: "error",
+          message:
             error instanceof Error ? error.message : "Unable to save brochure.",
+          retrySave: true,
         });
       }
     })();
@@ -5430,8 +5501,9 @@ export default function App({
     setAssemblyMode("brochure");
     setBrochureState({
       status: "success",
+      assets: brochure.assets,
+      dimensions: brochure.dimensions,
       generationId: brochure.generationId,
-      imageDataUrl: brochure.imageUrl,
       saved: true,
     });
     setIsCompactLibraryOpen(false);

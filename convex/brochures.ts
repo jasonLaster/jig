@@ -8,6 +8,23 @@ const dimensions = v.object({
   width: v.number(),
 });
 const params = v.record(v.string(), v.number());
+const brochureAssetKind = v.union(
+  v.literal("room-hero"),
+  v.literal("room-alternate"),
+  v.literal("table-three-quarter"),
+  v.literal("table-profile"),
+);
+const brochureAsset = v.object({
+  kind: brochureAssetKind,
+  storageId: v.id("_storage"),
+  mediaType: v.string(),
+});
+const brochureAssetKinds = [
+  "room-hero",
+  "room-alternate",
+  "table-three-quarter",
+  "table-profile",
+] as const;
 
 export const generateUploadUrl = mutation({
   args: {},
@@ -25,6 +42,7 @@ export const create = mutation({
     params,
     dimensions,
     referenceCount: v.number(),
+    outputCount: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -54,8 +72,9 @@ export const complete = mutation({
   args: {
     generationId: v.string(),
     clientId: v.string(),
-    imageStorageId: v.id("_storage"),
-    mediaType: v.string(),
+    imageStorageId: v.optional(v.id("_storage")),
+    mediaType: v.optional(v.string()),
+    assets: v.optional(v.array(brochureAsset)),
     warnings: v.array(v.string()),
   },
   handler: async (ctx, args) => {
@@ -68,26 +87,70 @@ export const complete = mutation({
     if (!brochure || brochure.clientId !== args.clientId) {
       throw new Error("Brochure generation not found");
     }
-
     if (
-      brochure.imageStorageId &&
-      brochure.imageStorageId !== args.imageStorageId
+      args.assets &&
+      (args.assets.length !== brochureAssetKinds.length ||
+        brochureAssetKinds.some(
+          (kind, index) => args.assets?.[index]?.kind !== kind,
+        ))
     ) {
-      await ctx.storage.delete(brochure.imageStorageId);
+      throw new Error("A complete ordered brochure asset set is required");
     }
+
+    const assets =
+      args.assets?.length
+        ? args.assets
+        : args.imageStorageId && args.mediaType
+          ? [
+              {
+                kind: "room-hero" as const,
+                storageId: args.imageStorageId,
+                mediaType: args.mediaType,
+              },
+            ]
+          : [];
+    if (assets.length === 0) {
+      throw new Error("Brochure assets are required");
+    }
+    const nextStorageIds = new Set(assets.map((asset) => asset.storageId));
+    const previousStorageIds = new Set([
+      ...(brochure.assets?.map((asset) => asset.storageId) ?? []),
+      ...(brochure.imageStorageId ? [brochure.imageStorageId] : []),
+    ]);
+    await Promise.all(
+      [...previousStorageIds]
+        .filter((storageId) => !nextStorageIds.has(storageId))
+        .map((storageId) => ctx.storage.delete(storageId)),
+    );
+    const primaryAsset = assets[0];
     await ctx.db.patch(brochure._id, {
       status: "complete",
-      imageStorageId: args.imageStorageId,
-      mediaType: args.mediaType,
+      assets,
+      outputCount: assets.length,
+      imageStorageId: primaryAsset.storageId,
+      mediaType: primaryAsset.mediaType,
       warnings: args.warnings,
       errorMessage: undefined,
       updatedAt: Date.now(),
     });
-    const imageUrl = await ctx.storage.getUrl(args.imageStorageId);
-    if (!imageUrl) {
-      throw new Error("Stored brochure image URL is unavailable");
+    const assetUrls = await Promise.all(
+      assets.map(async (asset) => ({
+        kind: asset.kind,
+        mediaType: asset.mediaType,
+        imageUrl: await ctx.storage.getUrl(asset.storageId),
+      })),
+    );
+    if (assetUrls.some((asset) => !asset.imageUrl)) {
+      throw new Error("A stored brochure image URL is unavailable");
     }
-    return { brochureId: brochure._id, imageUrl };
+    return {
+      brochureId: brochure._id,
+      imageUrl: assetUrls[0].imageUrl!,
+      assets: assetUrls.map((asset) => ({
+        ...asset,
+        imageUrl: asset.imageUrl!,
+      })),
+    };
   },
 });
 
@@ -125,12 +188,38 @@ export const listByClient = query({
       brochures
         .filter(
           (brochure) =>
-            brochure.status === "complete" && brochure.imageStorageId,
+            brochure.status === "complete" &&
+            (brochure.imageStorageId || brochure.assets?.length),
         )
-        .map(async (brochure) => ({
-          ...brochure,
-          imageUrl: await ctx.storage.getUrl(brochure.imageStorageId!),
-        })),
+        .map(async (brochure) => {
+          const assets =
+            brochure.assets?.length
+              ? brochure.assets
+              : brochure.imageStorageId && brochure.mediaType
+                ? [
+                    {
+                      kind: "room-hero" as const,
+                      storageId: brochure.imageStorageId,
+                      mediaType: brochure.mediaType,
+                    },
+                  ]
+                : [];
+          const assetUrls = await Promise.all(
+            assets.map(async (asset) => ({
+              kind: asset.kind,
+              mediaType: asset.mediaType,
+              imageUrl: await ctx.storage.getUrl(asset.storageId),
+            })),
+          );
+          return {
+            ...brochure,
+            imageUrl: assetUrls[0]?.imageUrl ?? null,
+            assets: assetUrls.filter(
+              (asset): asset is typeof asset & { imageUrl: string } =>
+                Boolean(asset.imageUrl),
+            ),
+          };
+        }),
     );
   },
 });
@@ -147,13 +236,36 @@ export const getByGenerationId = query({
     if (
       !brochure ||
       brochure.status !== "complete" ||
-      !brochure.imageStorageId
+      (!brochure.imageStorageId && !brochure.assets?.length)
     ) {
       return null;
     }
+    const assets =
+      brochure.assets?.length
+        ? brochure.assets
+        : brochure.imageStorageId && brochure.mediaType
+          ? [
+              {
+                kind: "room-hero" as const,
+                storageId: brochure.imageStorageId,
+                mediaType: brochure.mediaType,
+              },
+            ]
+          : [];
+    const assetUrls = await Promise.all(
+      assets.map(async (asset) => ({
+        kind: asset.kind,
+        mediaType: asset.mediaType,
+        imageUrl: await ctx.storage.getUrl(asset.storageId),
+      })),
+    );
     return {
       ...brochure,
-      imageUrl: await ctx.storage.getUrl(brochure.imageStorageId),
+      imageUrl: assetUrls[0]?.imageUrl ?? null,
+      assets: assetUrls.filter(
+        (asset): asset is typeof asset & { imageUrl: string } =>
+          Boolean(asset.imageUrl),
+      ),
     };
   },
 });

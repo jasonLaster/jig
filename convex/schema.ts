@@ -3,6 +3,12 @@ import { v } from "convex/values";
 
 const lengthUnit = v.union(v.literal("mm"), v.literal("cm"), v.literal("in"));
 const themeMode = v.union(v.literal("light"), v.literal("dark"));
+const brochureAssetKind = v.union(
+  v.literal("room-hero"),
+  v.literal("room-alternate"),
+  v.literal("table-three-quarter"),
+  v.literal("table-profile"),
+);
 
 export default defineSchema({
   models: defineTable({
@@ -59,8 +65,18 @@ export default defineSchema({
       width: v.number(),
     }),
     referenceCount: v.number(),
+    outputCount: v.optional(v.number()),
     imageStorageId: v.optional(v.id("_storage")),
     mediaType: v.optional(v.string()),
+    assets: v.optional(
+      v.array(
+        v.object({
+          kind: brochureAssetKind,
+          storageId: v.id("_storage"),
+          mediaType: v.string(),
+        }),
+      ),
+    ),
     warnings: v.optional(v.array(v.string())),
     errorMessage: v.optional(v.string()),
     createdAt: v.number(),

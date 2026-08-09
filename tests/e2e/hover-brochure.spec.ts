@@ -1,8 +1,17 @@
 import { expect, test } from "@playwright/test";
-import { buildBrochurePrompt, parseRequest } from "../../api/brochure";
+import {
+  BROCHURE_ASSET_SPECS,
+  buildBrochurePrompt,
+  parseRequest,
+} from "../../api/brochure";
 
 const MOCK_BROCHURE_IMAGE =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+const MOCK_BROCHURE_ASSETS = BROCHURE_ASSET_SPECS.map(({ kind }) => ({
+  imageDataUrl: MOCK_BROCHURE_IMAGE,
+  kind,
+  mediaType: "image/png",
+}));
 
 test("accepts brochure requests from tabs opened before generation IDs shipped", () => {
   const request = parseRequest({
@@ -41,6 +50,63 @@ test("accepts Wave brochure requests with model-specific geometry guidance", () 
   expect(prompt).toContain("two open end frames");
   expect(prompt).toContain("four short triangular corner braces");
   expect(prompt).toContain("no floor-level stretcher or diagonal X-members");
+});
+
+test("validates the four signed Convex upload destinations", () => {
+  const baseRequest = {
+    assetSet: true,
+    clientId: "asset-client-123",
+    dimensions: {
+      height: 749.3,
+      length: 1905,
+      topThickness: 31.75,
+      width: 901.7,
+    },
+    generationId: "asset-generation-1234567890",
+    images: Array.from({ length: 4 }, () => MOCK_BROCHURE_IMAGE),
+    modelId: "hover-dining-table",
+    modelName: "X-Hover Dining Table",
+  };
+  const uploads = BROCHURE_ASSET_SPECS.map(({ kind }, index) => ({
+    kind,
+    url: `https://example-${index}.convex.cloud/api/storage/upload?token=signed-${index}`,
+  }));
+
+  expect(parseRequest({ ...baseRequest, uploads })).not.toBeNull();
+  expect(
+    parseRequest({
+      ...baseRequest,
+      uploads: uploads.map((upload, index) =>
+        index === 2 ? { ...upload, url: "https://example.com/upload" } : upload,
+      ),
+    }),
+  ).toBeNull();
+});
+
+test("builds distinct room and table-only brochure compositions", () => {
+  const request = parseRequest({
+    clientId: "composition-client-123",
+    dimensions: {
+      height: 749.3,
+      length: 1905,
+      topThickness: 31.75,
+      width: 901.7,
+    },
+    generationId: "composition-generation-1234567890",
+    images: Array.from({ length: 4 }, () => MOCK_BROCHURE_IMAGE),
+    modelId: "hover-dining-table",
+    modelName: "X-Hover Dining Table",
+  })!;
+
+  expect(buildBrochurePrompt(request, "room-alternate")).toContain(
+    "opposite diagonal",
+  );
+  expect(buildBrochurePrompt(request, "table-three-quarter")).toContain(
+    "table alone—no chairs",
+  );
+  expect(buildBrochurePrompt(request, "table-profile")).toContain(
+    "near-orthographic proportions",
+  );
 });
 
 for (const model of [
@@ -98,8 +164,8 @@ for (const model of [
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
+          assets: MOCK_BROCHURE_ASSETS,
           generationId: requestPayload!.generationId,
-          imageDataUrl: MOCK_BROCHURE_IMAGE,
           model: "openai/gpt-image-2",
           warnings: [],
         }),
@@ -151,8 +217,8 @@ test("brochure mode captures four CAD angles and presents the generated image", 
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
+        assets: MOCK_BROCHURE_ASSETS,
         generationId: requestPayload!.generationId,
-        imageDataUrl: MOCK_BROCHURE_IMAGE,
         model: "openai/gpt-image-2",
         warnings: [],
       }),
@@ -187,6 +253,7 @@ test("brochure mode captures four CAD angles and presents the generated image", 
   expect(requestPayload!.clientId).toMatch(/^[a-zA-Z0-9-]{8,64}$/);
   expect(requestPayload!.generationId).toMatch(/^[a-zA-Z0-9-]{20,64}$/);
   expect(requestPayload!.images).toHaveLength(4);
+  expect((requestPayload as { assetSet?: boolean }).assetSet).toBe(true);
   expect(
     requestPayload!.images.every((image) =>
       image.startsWith("data:image/jpeg;base64,"),
@@ -201,14 +268,25 @@ test("brochure mode captures four CAD angles and presents the generated image", 
   releaseResponse();
   await expect(brochure).toHaveAttribute("data-status", "success");
   await expect(
-    page.getByAltText("X-Hover Dining Table in a generated brochure room scene"),
+    page.getByAltText("X-Hover Dining Table room scene · hero"),
   ).toHaveAttribute("src", MOCK_BROCHURE_IMAGE);
-  await expect(page.getByRole("link", { name: "Download PNG" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "Download view" })).toHaveAttribute(
     "download",
-    "x-hover-dining-table-brochure.png",
+    "x-hover-dining-table-room-hero.png",
   );
+  await expect(page.getByLabel("CAD dimensions")).toContainText("75 in");
+  await expect(page.getByLabel("CAD dimensions")).toContainText("35.5 in");
+  await expect(page.getByLabel("Brochure views").getByRole("button")).toHaveCount(
+    4,
+  );
+  await page
+    .getByRole("button", { name: "Show Table only · profile" })
+    .click();
   await expect(
-    page.getByText(/CAD model remains authoritative/),
+    page.getByAltText("X-Hover Dining Table table only · profile"),
+  ).toHaveAttribute("src", MOCK_BROCHURE_IMAGE);
+  await expect(
+    page.getByText(/dimensions come from the authoritative CAD model/),
   ).toBeVisible();
   await expect(page.getByText("Not saved", { exact: true })).toBeVisible();
 

@@ -2290,6 +2290,19 @@ html.dark .panel-section:nth-child(even) {
   height: 100%;
 }
 
+.hover-brochure-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.hover-brochure-stage::after {
+  position: absolute;
+  inset: 45% 0 0;
+  background: linear-gradient(transparent, rgba(21, 18, 15, 0.52));
+  content: "";
+  pointer-events: none;
+}
+
 .hover-brochure-backdrop {
   background:
     radial-gradient(circle at 62% 40%, rgba(255, 255, 255, 0.9), transparent 38%),
@@ -2299,6 +2312,122 @@ html.dark .panel-section:nth-child(even) {
 .hover-brochure-image {
   display: block;
   object-fit: cover;
+}
+
+.hover-brochure-specification {
+  position: absolute;
+  left: 18px;
+  bottom: 160px;
+  z-index: 2;
+  width: min(520px, calc(100% - 36px));
+  color: white;
+  text-shadow: 0 2px 24px rgba(18, 14, 10, 0.42);
+}
+
+.hover-brochure-specification > p {
+  margin: 0 0 5px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 10px;
+  font-weight: 820;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hover-brochure-specification > h2 {
+  margin: 0 0 13px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(25px, 3.3cqi, 40px);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+
+.hover-brochure-dimensions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.hover-brochure-dimensions > span {
+  display: grid;
+  min-width: 82px;
+  gap: 2px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(28, 24, 20, 0.48);
+  backdrop-filter: blur(12px);
+}
+
+.hover-brochure-dimensions small {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.hover-brochure-dimensions strong {
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.hover-brochure-filmstrip {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  z-index: 3;
+  display: flex;
+  max-width: calc(100% - 36px);
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.hover-brochure-filmstrip::-webkit-scrollbar {
+  display: none;
+}
+
+.hover-brochure-filmstrip button {
+  position: relative;
+  overflow: hidden;
+  width: 132px;
+  height: 82px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.36);
+  border-radius: 10px;
+  background: #2d2823;
+  box-shadow: 0 10px 28px rgba(20, 16, 12, 0.22);
+  color: white;
+  cursor: pointer;
+}
+
+.hover-brochure-filmstrip button[aria-pressed="true"] {
+  border-color: white;
+  box-shadow: 0 0 0 2px rgba(48, 38, 28, 0.42);
+}
+
+.hover-brochure-filmstrip button:focus-visible {
+  outline: 2px solid #f2c98e;
+  outline-offset: 2px;
+}
+
+.hover-brochure-filmstrip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hover-brochure-filmstrip span {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 14px 6px 6px;
+  background: linear-gradient(transparent, rgba(20, 17, 14, 0.82));
+  font-size: 8px;
+  font-weight: 760;
+  text-align: left;
 }
 
 .hover-brochure-toolbar {
@@ -2464,8 +2593,8 @@ html.dark .panel-section:nth-child(even) {
 
 .hover-brochure-disclaimer {
   position: absolute;
-  right: 18px;
-  bottom: 18px;
+  left: 18px;
+  bottom: 112px;
   z-index: 2;
   max-width: min(430px, calc(100% - 36px));
   margin: 0;

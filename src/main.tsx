@@ -9,6 +9,8 @@ import {
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import App, {
+  type BrochureAsset,
+  type BrochureAssetKind,
   getBrochureClientId,
   type BrochurePersistence,
   type SavedBrochure,
@@ -44,8 +46,23 @@ function ConnectedApp() {
       ...(listedBrochures ?? []),
       ...(requestedBrochure ? [requestedBrochure] : []),
     ]) {
-      if (brochure.imageUrl) {
-        unique.set(brochure.generationId, brochure as SavedBrochure);
+      const assets = (brochure.assets ?? []).filter(
+        (asset): asset is typeof asset & { imageUrl: string } =>
+          Boolean(asset.imageUrl),
+      ) as BrochureAsset[];
+      if (assets.length === 0 && brochure.imageUrl) {
+        assets.push({
+          kind: "room-hero",
+          imageUrl: brochure.imageUrl,
+          mediaType: brochure.mediaType ?? "image/png",
+        });
+      }
+      if (assets.length > 0) {
+        unique.set(brochure.generationId, {
+          ...brochure,
+          assets,
+          imageUrl: assets[0].imageUrl,
+        } as SavedBrochure);
       }
     }
     return [...unique.values()].sort((a, b) => b.updatedAt - a.updatedAt);
@@ -56,34 +73,29 @@ function ConnectedApp() {
       create: async (input) => {
         await createBrochure(input);
       },
+      createUploadUrls: async (kinds) =>
+        await Promise.all(
+          kinds.map(async (kind) => ({
+            kind,
+            url: await generateUploadUrl({}),
+          })),
+        ),
       complete: async ({
+        assets,
         clientId: ownerClientId,
         generationId,
-        imageDataUrl,
-        mediaType,
         warnings,
-      }) => {
-        const image = await fetch(imageDataUrl).then((response) => response.blob());
-        const uploadUrl = await generateUploadUrl({});
-        const uploadResponse = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "content-type": mediaType },
-          body: image,
-        });
-        if (!uploadResponse.ok) {
-          throw new Error(`Image upload failed (${uploadResponse.status}).`);
-        }
-        const { storageId } = (await uploadResponse.json()) as {
-          storageId: Id<"_storage">;
-        };
-        return await completeBrochure({
+      }) =>
+        (await completeBrochure({
+          assets: assets.map((asset) => ({
+            kind: asset.kind as BrochureAssetKind,
+            mediaType: asset.mediaType,
+            storageId: asset.storageId as Id<"_storage">,
+          })),
           clientId: ownerClientId,
           generationId,
-          imageStorageId: storageId,
-          mediaType,
           warnings,
-        });
-      },
+        })) as { assets: BrochureAsset[]; imageUrl: string },
       fail: async (input) => {
         await failBrochure(input);
       },
