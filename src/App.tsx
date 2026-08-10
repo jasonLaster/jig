@@ -82,6 +82,7 @@ import {
   createHoverDiningTableTemplateSegments,
   getHoverDiningTableTemplateSummary,
   getHoverDiningTablePieceCount,
+  getHoverDiningTableSpec,
   getHoverDiningTableStructuralAssessment,
   createRoundedTopGeometry,
   createSandChamberFloorGeometry,
@@ -1381,11 +1382,12 @@ const HolderViewer = forwardRef<
       if (!hoverHardwareGroup || !hoverExplodedGroup || !diningMetalMaterial) {
         return;
       }
-      mainMesh.geometry.dispose();
-      mainMesh.geometry = createHoverDiningTableGeometry(
+      const nextMainGeometry = createHoverDiningTableGeometry(
         latestParamsRef.current,
         model,
       );
+      mainMesh.geometry.dispose();
+      mainMesh.geometry = nextMainGeometry;
       hoverExplodedGroup.children.forEach((child) => {
         if (child instanceof THREE.Mesh) {
           child.geometry.dispose();
@@ -1975,7 +1977,14 @@ const HolderViewer = forwardRef<
     latestRenderModeRef.current = renderMode;
     latestShowOriginalRef.current = showOriginal;
     latestAssemblyModeRef.current = assemblyMode;
-    updateMeshes();
+    try {
+      updateMeshes();
+    } catch (error) {
+      console.warn(
+        "Ignored an invalid model transition and kept the last valid geometry.",
+        error,
+      );
+    }
   }, [params, coreViewMode, renderMode, showOriginal, assemblyMode, updateMeshes]);
 
   useEffect(() => {
@@ -5566,6 +5575,15 @@ export default function App({
           ),
         ),
       };
+      const acceptValidHoverParams = (candidate: ModelParams) => {
+        if (model.viewer !== "hover-dining-table-v1") return candidate;
+        try {
+          getHoverDiningTableSpec(candidate);
+          return candidate;
+        } catch {
+          return current;
+        }
+      };
       if (
         model.id === "whisperer" &&
         key === "levelingFeetEnabled" &&
@@ -5664,10 +5682,12 @@ export default function App({
               );
             }
           }
-          return synchronizeHoverCrossbarDimensions(model, next);
+          return acceptValidHoverParams(
+            synchronizeHoverCrossbarDimensions(model, next),
+          );
         }
       }
-      return next;
+      return acceptValidHoverParams(next);
     });
   };
 

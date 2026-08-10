@@ -4559,6 +4559,18 @@ export function getHoverDiningTableParameterLimits(
   const limits = { ...getParameter(model, key).limits };
   const spec = rawHoverDiningTableSpec(params);
   const safeMax = (value: number) => Math.max(limits.min, value);
+  const requiredTopOpeningHalfWidth =
+    spec.frameInnerTopCornerRadius +
+    spec.upperBrace.endpointInset +
+    spec.upperBrace.miterHalfWidth +
+    spec.upperBrace.width / 2 +
+    MIN_FRAME_FACE_FLAT / 2;
+  const requiredBottomOpeningHalfWidth =
+    spec.frameInnerBottomCornerRadius +
+    spec.lowerBrace.endpointInset +
+    spec.lowerBrace.miterHalfWidth +
+    spec.lowerBrace.width / 2 +
+    MIN_FRAME_FACE_FLAT / 2;
 
   if (key === "tableLength") {
     limits.min = Math.max(
@@ -4577,11 +4589,11 @@ export function getHoverDiningTableParameterLimits(
       limits.min,
       2 * spec.sideOverhang +
         2 * spec.frameSideWidth +
-        2 * spec.frameInnerTopCornerRadius,
+        2 * requiredTopOpeningHalfWidth,
       2 * spec.sideOverhang -
         spec.frameBottomSpread +
         2 * spec.frameSideWidth +
-        2 * spec.frameInnerBottomCornerRadius,
+        2 * requiredBottomOpeningHalfWidth,
       spec.channels.sideInset * 2 +
         spec.channels.wallThickness * 2 +
         limits.step,
@@ -4636,15 +4648,12 @@ export function getHoverDiningTableParameterLimits(
     );
     limits.max = Math.min(
       limits.max,
-      (spec.width -
-        2 * spec.frameSideWidth -
-        2 * spec.frameInnerTopCornerRadius) /
-        2,
-      (spec.width +
-        spec.frameBottomSpread -
-        2 * spec.frameSideWidth -
-        2 * spec.frameInnerBottomCornerRadius) /
-        2,
+      spec.width / 2 -
+        spec.frameSideWidth -
+        requiredTopOpeningHalfWidth,
+      (spec.width + spec.frameBottomSpread) / 2 -
+        spec.frameSideWidth -
+        requiredBottomOpeningHalfWidth,
     );
   } else if (key === "endOverhang") {
     limits.min = Math.max(
@@ -4731,13 +4740,14 @@ export function getHoverDiningTableParameterLimits(
           ((spec.endFrameStyle === "box"
             ? spec.frameOuterBottomCornerRadius
             : 0) +
-            spec.levelingFeet.rodDiameter / 2),
+            spec.levelingFeet.rodDiameter / 2) +
+          MIN_FRAME_FACE_FLAT,
       );
     }
     limits.max = Math.min(
       limits.max,
-      (spec.frameTopWidth - 2 * spec.frameInnerTopCornerRadius) / 2,
-      (spec.frameBottomWidth - 2 * spec.frameInnerBottomCornerRadius) / 2,
+      spec.frameTopWidth / 2 - requiredTopOpeningHalfWidth,
+      spec.frameBottomWidth / 2 - requiredBottomOpeningHalfWidth,
     );
   } else if (key === "frameBottomRailHeight" || key === "frameTopRailHeight") {
     limits.min = Math.max(
@@ -4761,7 +4771,7 @@ export function getHoverDiningTableParameterLimits(
       limits.min,
       -spec.frameTopWidth +
         2 * spec.frameSideWidth +
-        2 * spec.frameInnerBottomCornerRadius,
+        2 * requiredBottomOpeningHalfWidth,
     );
     limits.max = Math.min(limits.max, spec.sideOverhang * 2);
   } else if (key === "frameOuterTopCornerRadius") {

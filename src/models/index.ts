@@ -71,6 +71,7 @@ export {
   createHoverDiningTableGeometry,
   createHoverDiningTableHardwareGeometries,
   getHoverDiningTableEndBoxFabricationProfiles,
+  getHoverDiningTableSpec,
   getHoverDiningTableStileFabricationLayout,
   getHoverDiningTableCutList,
   getHoverDiningTablePieceCount,

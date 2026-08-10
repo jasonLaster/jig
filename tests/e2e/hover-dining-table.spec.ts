@@ -1217,6 +1217,95 @@ test("supports independent half-inch end-box stiles", () => {
   }
 });
 
+test("keeps end-box side-width boundaries inside the full geometry contract", () => {
+  const inch = 25.4;
+  const reportedParams = {
+    ...defaultParams,
+    cornerBraceReach: 6.5 * inch,
+    frameDepth: 4.248 * inch,
+    frameSideWidth: 2 * inch,
+    frameBottomRailHeight: 1 * inch,
+  };
+  const exerciseBoundary = (params: ModelParams, frameSideWidth: number) => {
+    const candidate = { ...params, frameSideWidth };
+    const roundoverLimits = getHoverDiningTableParameterLimits(
+      model,
+      candidate,
+      "frameEdgeRoundover",
+    );
+    candidate.frameEdgeRoundover = Math.min(
+      roundoverLimits.max,
+      Math.max(roundoverLimits.min, candidate.frameEdgeRoundover),
+    );
+
+    const { fullSize: spec } = getHoverDiningTableSpec(candidate);
+    expect(spec.openingTopWidth).toBeGreaterThan(
+      spec.frameInnerTopCornerRadius * 2,
+    );
+    expect(spec.openingBottomWidth).toBeGreaterThan(
+      spec.frameInnerBottomCornerRadius * 2,
+    );
+    expect(spec.upperBrace.endpointY).toBeGreaterThan(
+      spec.upperBrace.width / 2,
+    );
+    expect(spec.lowerBrace.endpointY).toBeGreaterThan(
+      spec.lowerBrace.width / 2,
+    );
+    expect(spec.levelingFeet.outerEntryClearance).toBeGreaterThan(0);
+
+    const assembled = createHoverDiningTableGeometry(candidate, model);
+    const assembledInspection = inspectGeometry(assembled);
+    expect(assembledInspection.finite).toBe(true);
+    expect(assembledInspection.degenerateTriangles).toBe(0);
+    assembled.dispose();
+
+    const hardware = createHoverDiningTableHardwareGeometries(candidate);
+    for (const geometry of [...hardware.channels, ...hardware.feet]) {
+      expect(inspectGeometry(geometry).finite).toBe(true);
+      geometry.dispose();
+    }
+
+    const exploded = createHoverDiningTableExplodedParts(candidate, model);
+    for (const part of exploded) {
+      expect(inspectGeometry(part.geometry).finite, part.name).toBe(true);
+      part.geometry.dispose();
+    }
+  };
+
+  const reportedLimits = getHoverDiningTableParameterLimits(
+    model,
+    reportedParams,
+    "frameSideWidth",
+  );
+  expect(reportedLimits.min).toBeCloseTo(2 * inch, 6);
+  for (const frameSideWidth of [reportedLimits.min, reportedLimits.max]) {
+    exerciseBoundary(reportedParams, frameSideWidth);
+  }
+
+  const narrowParams = {
+    ...reportedParams,
+    sideOverhang: 10.5 * inch,
+    endOverhang: 8.248 * inch,
+    frameDepth: 3 * inch,
+    frameBottomRailHeight: 1.252 * inch,
+    frameTopRailHeight: 1.748 * inch,
+    bottomSupportStyle: 1,
+    bottomSupportWidth: 2.5 * inch,
+    bottomSupportEdgeRadius: 0.5315 * inch,
+  };
+  const narrowLimits = getHoverDiningTableParameterLimits(
+    model,
+    narrowParams,
+    "frameSideWidth",
+  );
+  expect(narrowLimits.min).toBeCloseTo(2 * inch, 6);
+  expect(narrowLimits.max).toBeGreaterThanOrEqual(narrowLimits.min);
+  expect(narrowLimits.max).toBeLessThan(2.25 * inch);
+  for (const frameSideWidth of [narrowLimits.min, narrowLimits.max]) {
+    exerciseBoundary(narrowParams, frameSideWidth);
+  }
+});
+
 test("grades wobble risks and responds monotonically to structural parameters", () => {
   const baseline = getHoverDiningTableStructuralAssessment(defaultParams);
   expect(baseline.metrics).toHaveLength(6);
@@ -3250,6 +3339,57 @@ test("loads the narrow end-box shared configuration without crashing", async ({
   await expect(
     page.getByText("1 centered lengthwise board · 52 1/2 in long"),
   ).toBeVisible();
+  await page.getByRole("button", { name: "End boxes" }).click();
+  const sideWidthSlider = page.locator("#end-box-side-width");
+  const sideWidthBounds = await sideWidthSlider.evaluate((input) => ({
+    min: Number((input as HTMLInputElement).min),
+    max: Number((input as HTMLInputElement).max),
+    step: Number((input as HTMLInputElement).step),
+  }));
+  expect(sideWidthBounds.min).toBeCloseTo(2, 4);
+  expect(sideWidthBounds.max).toBeGreaterThanOrEqual(sideWidthBounds.min);
+  expect(sideWidthBounds.max).toBeLessThan(2.25);
+  const reachableMaximum =
+    sideWidthBounds.min +
+    Math.floor(
+      (sideWidthBounds.max - sideWidthBounds.min) / sideWidthBounds.step,
+    ) *
+      sideWidthBounds.step;
+  await sideWidthSlider.fill(String(reachableMaximum));
+  await expect(
+    page.getByLabel("X-Hover Dining Table model viewer"),
+  ).toBeVisible();
+  await expect(page.locator(".scene-panel canvas")).toBeVisible();
+  await sideWidthSlider.fill(String(sideWidthBounds.min));
+  await expect(
+    page.getByLabel("End-box side width in inches"),
+  ).toHaveValue("2");
+  expect(pageErrors).toEqual([]);
+});
+
+test("keeps the reported shared configuration stable at side-width boundaries", async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") pageErrors.push(message.text());
+  });
+  await page.goto(
+    "/?model=hover-dining-table&unit=in&channelEndClearance=4&channelSideInset=2&channelWallThickness=0.125&cornerBraceReach=6.5&mockScale=10&tableLength=75&tableWidth=35.5&overallHeight=29.5&topThickness=1.25&topEdgeRoll=0.625&topEdgeTension=0.552&topPlanCornerRadius=0&topEndFaceRoundover=0&sideOverhang=1.75&endOverhang=7.5&channelWidth=2&channelDepth=0.375&endFrameStyle=0&frameDepth=4.248&frameSideWidth=2&frameBottomRailHeight=1&frameTopRailHeight=1.25&frameBottomSpread=0&frameOuterTopCornerRadius=0.75&frameOuterBottomCornerRadius=0.75&frameInnerTopCornerRadius=2.5&frameInnerBottomCornerRadius=2.5&frameOuterRailCurveTension=0.552&frameOuterStileCurveTension=0.552&frameInnerRailCurveTension=0.58&frameInnerStileCurveTension=0.58&frameEdgeRoundover=0.375&levelingFeetEnabled=1&levelingFootPadDiameter=1.5&levelingFootPadThickness=0.25&levelingFootRodDiameter=0.375&levelingFootRodLength=3&levelingFootExtension=0.75&topSupportStyle=0&bottomSupportStyle=0&syncCrossbarDimensions=0&topSupportWidth=2&topSupportThickness=1.25&topSupportEndpointInset=0&topSupportEdgeRadius=0.125&bottomSupportWidth=2&bottomSupportThickness=1.25&bottomSupportEndpointInset=0&bottomSupportEdgeRadius=0.125&bottomSupportTopEdgeRadius=0&halfLapClearance=0&templateThickness=0.125&templatePlateLength=9&templateDovetailDepth=0.5&templateJointClearance=0.0079",
+  );
+  await expect(
+    page.getByLabel("X-Hover Dining Table model viewer"),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "End boxes" }).click();
+  const sideWidthSlider = page.locator("#end-box-side-width");
+  await expect(sideWidthSlider).toHaveAttribute("min", "2");
+  await expect(sideWidthSlider).toHaveAttribute("max", "5");
+  await sideWidthSlider.fill("5");
+  await expect(page).toHaveURL(/frameSideWidth=5/);
+  await sideWidthSlider.fill("2");
+  await expect(page).toHaveURL(/frameSideWidth=2/);
+  await expect(page.locator(".scene-panel canvas")).toBeVisible();
   expect(pageErrors).toEqual([]);
 });
 

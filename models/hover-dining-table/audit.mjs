@@ -172,6 +172,73 @@ const lowerEnd = deriveBraceEnd(
   params.bottomSupportWidth,
   params.bottomSupportEndpointInset,
 );
+const frameSideWidthParameter = model.parameters.find(
+  (parameter) => parameter.key === "frameSideWidth",
+);
+const minimumFrameFaceFlat = 0.125 * inch;
+const requiredTopOpeningHalfWidth =
+  params.frameInnerTopCornerRadius +
+  params.topSupportEndpointInset +
+  upperEnd.miterHalfWidth +
+  params.topSupportWidth / 2 +
+  minimumFrameFaceFlat / 2;
+const requiredBottomOpeningHalfWidth =
+  params.frameInnerBottomCornerRadius +
+  params.bottomSupportEndpointInset +
+  lowerEnd.miterHalfWidth +
+  params.bottomSupportWidth / 2 +
+  minimumFrameFaceFlat / 2;
+const auditedFrameSideWidthMin = Math.max(
+  frameSideWidthParameter.limits.min,
+  2 *
+      (params.frameOuterBottomCornerRadius +
+        params.levelingFootRodDiameter / 2) +
+    minimumFrameFaceFlat,
+);
+const auditedFrameSideWidthMax = Math.min(
+  frameSideWidthParameter.limits.max,
+  frameTopWidth / 2 - requiredTopOpeningHalfWidth,
+  frameBottomWidth / 2 - requiredBottomOpeningHalfWidth,
+);
+const auditFrameSideWidthBoundary = (sideWidth, label) => {
+  const topOpening = frameTopWidth - 2 * sideWidth;
+  const bottomOpening = frameBottomWidth - 2 * sideWidth;
+  const topEnd = deriveBraceEnd(
+    topOpening,
+    params.frameInnerTopCornerRadius,
+    params.topSupportWidth,
+    params.topSupportEndpointInset,
+  );
+  const bottomEnd = deriveBraceEnd(
+    bottomOpening,
+    params.frameInnerBottomCornerRadius,
+    params.bottomSupportWidth,
+    params.bottomSupportEndpointInset,
+  );
+  assert.ok(topOpening > 2 * params.frameInnerTopCornerRadius, `${label} top opening`);
+  assert.ok(
+    bottomOpening > 2 * params.frameInnerBottomCornerRadius,
+    `${label} bottom opening`,
+  );
+  assert.ok(topEnd.endpointY > params.topSupportWidth / 2, `${label} upper X bearing`);
+  assert.ok(
+    bottomEnd.endpointY > params.bottomSupportWidth / 2,
+    `${label} lower X bearing`,
+  );
+  assert.ok(
+    sideWidth / 2 -
+        params.frameOuterBottomCornerRadius -
+        params.levelingFootRodDiameter / 2 >
+      0,
+    `${label} leveling-foot entry margin`,
+  );
+};
+assert.ok(
+  auditedFrameSideWidthMax >= auditedFrameSideWidthMin,
+  "end-box side-width limits must retain a non-empty valid range",
+);
+auditFrameSideWidthBoundary(auditedFrameSideWidthMin, "minimum side width");
+auditFrameSideWidthBoundary(auditedFrameSideWidthMax, "maximum side width");
 const upperEndpointY = upperEnd.endpointY;
 const lowerEndpointY = lowerEnd.endpointY;
 const upperSpanY = upperEndpointY * 2;
