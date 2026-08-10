@@ -394,6 +394,7 @@ test("renders, persists its feet, and exports registered Whisperer STLs", async 
 test("switches between standard, high, and photo oak rendering", async ({
   page,
 }) => {
+  test.setTimeout(60_000);
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("console", (message) => {

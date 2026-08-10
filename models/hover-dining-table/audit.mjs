@@ -293,7 +293,7 @@ for (const required of [
   "createEndBoxPartProfiles",
   "createSelectivelyRoundedExtrusion",
   "assertFabricationProfile",
-  "four Bézier returns and two square tangent seams",
+  "consistent corner returns and two square tangent seams",
   "parts.length !== expectedPieces",
   "getHoverDiningTableCutList",
   "Hover-table cut list must account for",

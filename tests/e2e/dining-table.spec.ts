@@ -9,12 +9,41 @@ import {
   getDefaultParams,
   getDiningTableStructuralAssessment,
 } from "../../src/models";
+import type { WoodGrainPart } from "../../src/models/woodGrainUvs";
+import { getWoodSpeciesForModel } from "../../src/woodTexture";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const model = JSON.parse(
   fs.readFileSync(path.join(root, "public/models/dining-table/model.json"), "utf8"),
 );
 const defaultParams = getDefaultParams(model);
+
+test("maps Plate Table oak grain along its top and four posts", () => {
+  expect(getWoodSpeciesForModel(model.id)).toBe("oak");
+  const geometry = createDiningTableWoodGeometry(defaultParams, model);
+  const parts = geometry.userData.woodGrainParts as WoodGrainPart[];
+  expect(parts.map((part) => part.name)).toEqual([
+    "tabletop",
+    "leg-left-front",
+    "leg-left-rear",
+    "leg-right-front",
+    "leg-right-rear",
+  ]);
+  expect(parts[0].direction).toEqual([1, 0, 0]);
+  for (const leg of parts.slice(1)) {
+    expect(leg.direction).toEqual([0, 0, 1]);
+  }
+  expect(parts.reduce((sum, part) => sum + part.vertexCount, 0)).toBe(
+    geometry.getAttribute("position").count,
+  );
+  const uv = geometry.getAttribute("uv");
+  expect(uv.count).toBe(geometry.getAttribute("position").count);
+  for (let index = 0; index < uv.count; index += 1) {
+    expect(Number.isFinite(uv.getX(index))).toBe(true);
+    expect(Number.isFinite(uv.getY(index))).toBe(true);
+  }
+  geometry.dispose();
+});
 
 function inspectStl(buffer: Buffer) {
   const arrayBuffer = buffer.buffer.slice(

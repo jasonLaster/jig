@@ -3,6 +3,10 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { formatLength } from "../units";
 import { getParam, getParameter } from "./shared";
 import {
+  assignDirectionalWoodUvs,
+  collectWoodGrainParts,
+} from "./woodGrainUvs";
+import {
   createWhispererTableWoodGeometry,
   createWhispererTableHardwareGeometries,
   getWhispererTableAuditValue,
@@ -293,6 +297,10 @@ function scaled(params: ModelParams, key: string) {
   return getParam(params, key) / getParam(params, "mockScale");
 }
 
+function grainTextureSize(params: ModelParams) {
+  return 800 / getParam(params, "mockScale");
+}
+
 function createTabletopGeometry(
   params: ModelParams,
   model: DiningTableModelDefinition,
@@ -320,6 +328,12 @@ function createTabletopGeometry(
     model.geometry.cornerSegments,
   );
   geometry.translate(0, 0, legHeight);
+  assignDirectionalWoodUvs(
+    geometry,
+    new THREE.Vector3(1, 0, 0),
+    grainTextureSize(params),
+    "tabletop",
+  );
   return geometry;
 }
 
@@ -384,6 +398,11 @@ function createLegGeometry(
     model.geometry.cornerSegments,
   );
   geometry.translate(x, y, bottomZ);
+  assignDirectionalWoodUvs(
+    geometry,
+    new THREE.Vector3(0, 0, 1),
+    grainTextureSize(params),
+  );
   return geometry;
 }
 
@@ -508,9 +527,32 @@ export function createDiningTableWoodGeometry(
       ),
     ),
   ];
+  const legNames = [
+    "leg-left-front",
+    "leg-left-rear",
+    "leg-right-front",
+    "leg-right-rear",
+  ];
+  geometries.slice(1).forEach((geometry, index) => {
+    const direction = geometry.userData.woodGrainDirection as [
+      number,
+      number,
+      number,
+    ];
+    geometry.userData.woodGrainParts = [
+      {
+        direction,
+        name: legNames[index],
+        vertexCount: geometry.getAttribute("position").count,
+        vertexStart: 0,
+      },
+    ];
+  });
   const merged = mergeGeometries(geometries, false);
+  const woodGrainParts = collectWoodGrainParts(geometries);
   geometries.forEach((geometry) => geometry.dispose());
   if (!merged) throw new Error("Unable to merge dining-table wood geometry");
+  merged.userData.woodGrainParts = woodGrainParts;
   merged.computeBoundingBox();
   merged.computeBoundingSphere();
   return merged;

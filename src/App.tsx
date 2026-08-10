@@ -825,7 +825,7 @@ function writeUrlState({
   url.searchParams.set("unit", unit);
   url.searchParams.delete("theme");
   url.searchParams.delete("quality");
-  if (modelId === "whisperer") {
+  if (getWoodSpeciesForModel(modelId)) {
     url.searchParams.set("quality", renderQuality);
   }
 
@@ -1998,7 +1998,8 @@ const HolderViewer = forwardRef<
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     const useDetailedLighting =
-      model.id === "whisperer" && renderQuality !== "standard";
+      getWoodSpeciesForModel(model.id) !== null &&
+      renderQuality !== "standard";
     renderer.toneMapping = useDetailedLighting
       ? THREE.ACESFilmicToneMapping
       : THREE.NoToneMapping;
@@ -2191,7 +2192,7 @@ const HolderViewer = forwardRef<
 
         const woodSpecies = getWoodSpeciesForModel(model.id);
         const useDetailedOak =
-          model.id === "whisperer" && renderQuality !== "standard";
+          woodSpecies === "oak" && renderQuality !== "standard";
         if (useDetailedOak) {
           try {
             oakAssets = await loadOakRenderingAssets(renderer);
@@ -2553,7 +2554,7 @@ const HolderViewer = forwardRef<
           <span key={item}>{item}</span>
         ))}
         <span>{RENDER_MODE_LABELS[renderMode]}</span>
-        {model.id === "whisperer" ? (
+        {getWoodSpeciesForModel(model.id) ? (
           <span>{RENDER_QUALITY_LABELS[renderQuality]} render</span>
         ) : null}
         {model.viewer === "hover-dining-table-v1" &&
@@ -4876,7 +4877,7 @@ function WorkspaceActionsMenu({
                 onChange={onRenderModeChange}
                 value={renderMode}
               />
-              {model.id === "whisperer" ? (
+              {getWoodSpeciesForModel(model.id) ? (
                 <RenderQualityControl
                   onChange={onRenderQualityChange}
                   value={renderQuality}
@@ -5197,7 +5198,7 @@ export default function App({
         setCoreViewMode("surface");
         setRenderMode("solid");
         setRenderQuality(
-          nextModel.id === "whisperer"
+          getWoodSpeciesForModel(nextModel.id)
             ? getRequestedRenderQuality()
             : "standard",
         );

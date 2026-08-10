@@ -23,6 +23,7 @@ import type {
   HoverDiningTableModelDefinition,
   ModelParams,
 } from "../../src/models/types";
+import type { WoodGrainPart } from "../../src/models/woodGrainUvs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const model = JSON.parse(
@@ -43,6 +44,49 @@ const waveModel = JSON.parse(
 const waveDefaultParams = Object.fromEntries(
   waveModel.parameters.map((parameter) => [parameter.key, parameter.default]),
 ) as ModelParams;
+
+test("maps oak grain by member for X-Hover and The Wave", () => {
+  for (const [definition, params] of [
+    [model, defaultParams],
+    [waveModel, waveDefaultParams],
+  ] as const) {
+    const geometry = createHoverDiningTableGeometry(params, definition);
+    const parts = geometry.userData.woodGrainParts as WoodGrainPart[];
+    const position = geometry.getAttribute("position");
+    expect(parts.length, definition.name).toBeGreaterThan(8);
+    expect(parts[0].name, definition.name).toBe("tabletop");
+    expect(parts[0].direction, definition.name).toEqual([1, 0, 0]);
+    expect(
+      parts.some((part) => part.name.includes("top-rail") && Math.abs(part.direction[1]) > 0.99),
+      `${definition.name} cross-grain rails`,
+    ).toBe(true);
+    expect(
+      parts.some((part) =>
+        (part.name.includes("stile") || part.name.includes("leg")) &&
+        Math.abs(part.direction[2]) > 0.8
+      ),
+      `${definition.name} upright grain`,
+    ).toBe(true);
+    expect(
+      parts.some((part) =>
+        (part.name.includes("x-bar") || part.name.includes("knee-brace")) &&
+        Math.abs(part.direction[0]) > 0.5 &&
+        Math.abs(part.direction[1]) > 0.15
+      ),
+      `${definition.name} diagonal grain`,
+    ).toBe(true);
+    expect(parts.reduce((sum, part) => sum + part.vertexCount, 0)).toBe(
+      position.count,
+    );
+    for (const part of parts) {
+      expect(
+        Math.hypot(...part.direction),
+        `${definition.name} ${part.name}`,
+      ).toBeCloseTo(1, 6);
+    }
+    geometry.dispose();
+  }
+});
 
 function inspectGeometry(geometry: THREE.BufferGeometry) {
   geometry.computeBoundingBox();
@@ -98,17 +142,18 @@ function inspectWoodUvs(geometry: THREE.BufferGeometry) {
   const position = geometry.getAttribute("position");
   const uv = geometry.getAttribute("uv");
   let finite = Boolean(uv) && uv.count === position.count;
-  let inUnitRange = finite;
+  let varying = false;
   if (uv) {
+    const firstU = uv.getX(0);
+    const firstV = uv.getY(0);
     for (let index = 0; index < uv.count; index += 1) {
       const u = uv.getX(index);
       const v = uv.getY(index);
       finite &&= Number.isFinite(u) && Number.isFinite(v);
-      inUnitRange &&= u >= -1e-6 && u <= 1 + 1e-6;
-      inUnitRange &&= v >= -1e-6 && v <= 1 + 1e-6;
+      varying ||= Math.abs(u - firstU) > 1e-6 || Math.abs(v - firstV) > 1e-6;
     }
   }
-  return { finite, inUnitRange, count: uv?.count ?? 0 };
+  return { finite, varying, count: uv?.count ?? 0 };
 }
 
 function uniqueAxisCoordinates(
@@ -592,7 +637,7 @@ test("derives two centered half-lapped Xs above four adjustable feet", () => {
   expect(inspected.size.z).toBeCloseTo(scaled.height - scaled.frameBottomZ, 4);
   const woodUvs = inspectWoodUvs(geometry);
   expect(woodUvs.finite).toBe(true);
-  expect(woodUvs.inUnitRange).toBe(true);
+  expect(woodUvs.varying).toBe(true);
   expect(woodUvs.count).toBe(inspected.position.count);
 
   let centralFloorVertices = 0;
@@ -1614,7 +1659,7 @@ test("explodes the assembly into wood parts, channels, and four leveling feet", 
     if (part.material === "Oak") {
       const woodUvs = inspectWoodUvs(part.geometry);
       expect(woodUvs.finite, part.name).toBe(true);
-      expect(woodUvs.inUnitRange, part.name).toBe(true);
+      expect(woodUvs.varying, part.name).toBe(true);
       expect(woodUvs.count, part.name).toBe(inspected.position.count);
     }
     expect(part.offset.toArray().every(Number.isFinite), part.name).toBe(true);

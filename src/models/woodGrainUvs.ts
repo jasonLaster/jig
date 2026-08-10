@@ -2,6 +2,13 @@ import * as THREE from "three";
 
 const GRAIN_EPSILON = 1e-6;
 
+export type WoodGrainPart = {
+  direction: [number, number, number];
+  name: string;
+  vertexCount: number;
+  vertexStart: number;
+};
+
 function fallbackFaceAxis(normal: THREE.Vector3) {
   const reference =
     Math.abs(normal.z) < 0.9
@@ -19,6 +26,7 @@ export function assignDirectionalWoodUvs(
   geometry: THREE.BufferGeometry,
   grainDirection: THREE.Vector3,
   textureSize: number,
+  partName?: string,
 ) {
   geometry.computeVertexNormals();
   const position = geometry.getAttribute("position");
@@ -49,5 +57,43 @@ export function assignDirectionalWoodUvs(
   }
 
   geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
-  geometry.userData.woodGrainDirection = grain.toArray();
+  const direction = grain.toArray() as [number, number, number];
+  geometry.userData.woodGrainDirection = direction;
+  if (partName) {
+    geometry.userData.woodGrainParts = [
+      {
+        direction,
+        name: partName,
+        vertexCount: position.count,
+        vertexStart: 0,
+      } satisfies WoodGrainPart,
+    ];
+  }
+}
+
+/** Carries member-level grain metadata through a non-indexed geometry merge. */
+export function collectWoodGrainParts(
+  geometries: THREE.BufferGeometry[],
+): WoodGrainPart[] {
+  const parts: WoodGrainPart[] = [];
+  let vertexOffset = 0;
+
+  for (const geometry of geometries) {
+    const vertexCount = geometry.getAttribute("position").count;
+    const sourceParts = geometry.userData.woodGrainParts as
+      | WoodGrainPart[]
+      | undefined;
+    if (sourceParts) {
+      parts.push(
+        ...sourceParts.map((part) => ({
+          ...part,
+          direction: [...part.direction] as [number, number, number],
+          vertexStart: vertexOffset + part.vertexStart,
+        })),
+      );
+    }
+    vertexOffset += vertexCount;
+  }
+
+  return parts;
 }

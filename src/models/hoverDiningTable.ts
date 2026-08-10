@@ -2,6 +2,10 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { formatLength, formatSignedLength } from "../units";
 import { getParam, getParameter } from "./shared";
+import {
+  assignDirectionalWoodUvs,
+  collectWoodGrainParts,
+} from "./woodGrainUvs";
 import type {
   AuditCheckDefinition,
   AuditItem,
@@ -1220,6 +1224,10 @@ export function getHoverDiningTableSpec(params: ModelParams) {
     levelingFeet: scaleLevelingFeet(fullSize.levelingFeet, scale),
   };
   return { fullSize, scaled };
+}
+
+function grainTextureSize(spec: HoverDiningTableSpec) {
+  return 800 / spec.scale;
 }
 
 type CubicProfileSegment = {
@@ -2740,10 +2748,17 @@ function createTabletopGeometry(
   if (transitionLength > EPSILON) {
     segments.push(createRoundedTabletopEndGeometry(spec, model, 1));
   }
-  return mergeGeometryList(
+  const geometry = mergeGeometryList(
     segments,
     "Unable to merge mortised Hover-table tabletop geometry",
   );
+  assignDirectionalWoodUvs(
+    geometry,
+    new THREE.Vector3(1, 0, 0),
+    grainTextureSize(spec),
+    "tabletop",
+  );
+  return geometry;
 }
 
 function createCChannelGeometry(channel: CChannelSpec, centerX: number) {
@@ -2849,62 +2864,19 @@ function createEndFrameGeometry(
   model: HoverDiningTableModelDefinition,
   x: number,
 ) {
-  if (spec.endFrameStyle === "legs") {
-    return mergeGeometryList(
-      (["top", "left", "right"] as const).map((position) =>
-        createEndBoxFinishedPartGeometry(spec, model, x, position),
-      ),
-      "Unable to merge open-leg end-frame geometry",
-    );
-  }
-  const shape = new THREE.Shape();
-  addRoundedTrapezoid(
-    shape,
-    spec.frameBottomWidth,
-    spec.frameTopWidth,
-    0,
-    spec.frameHeight,
-    spec.frameOuterBottomCornerRadius,
-    spec.frameOuterTopCornerRadius,
-    spec.frameOuterRailCurveTension,
-    spec.frameOuterStileCurveTension,
-  );
-  const opening = new THREE.Path();
-  addRoundedTrapezoid(
-    opening,
-    spec.openingBottomWidth,
-    spec.openingTopWidth,
-    spec.openingBottom,
-    spec.openingTop,
-    spec.frameInnerBottomCornerRadius,
-    spec.frameInnerTopCornerRadius,
-    spec.frameInnerRailCurveTension,
-    spec.frameInnerStileCurveTension,
-  );
-  shape.holes.push(opening);
-
-  const bevelThickness = spec.frameEdgeRoundover;
-  const depth = spec.frameDepth - bevelThickness * 2;
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    bevelEnabled: true,
-    bevelOffset: -bevelThickness,
-    bevelSegments: model.geometry.bevelSegments,
-    bevelSize: bevelThickness,
-    bevelThickness,
-    curveSegments: model.geometry.curveSegments,
-    depth,
-    steps: 1,
-  });
-  geometry.applyMatrix4(
-    new THREE.Matrix4().set(
-      0, 0, 1, x - depth / 2,
-      1, 0, 0, 0,
-      0, 1, 0, spec.frameBottomZ,
-      0, 0, 0, 1,
+  const positions: EndBoxPartPosition[] =
+    spec.endFrameStyle === "legs"
+      ? ["top", "left", "right"]
+      : ["top", "bottom", "left", "right"];
+  const errorMessage = spec.endFrameStyle === "legs"
+    ? "Unable to merge open-leg end-frame geometry"
+    : "Unable to merge closed-box end-frame geometry";
+  return mergeGeometryList(
+    positions.map((position) =>
+      createEndBoxFinishedPartGeometry(spec, model, x, position),
     ),
+    errorMessage,
   );
-  geometry.computeVertexNormals();
-  return geometry;
 }
 
 function polygonArea(points: THREE.Vector2[]) {
@@ -3317,6 +3289,7 @@ function createCornerKneeBraceFabricationProfile(
 function createCornerKneeBraceParts(
   braces: CornerKneeBraceSpec,
   model: HoverDiningTableModelDefinition,
+  textureSize: number,
 ) {
   if (!braces.enabled) return [];
   const plane = cornerKneeBraceAsPlane(braces);
@@ -3336,6 +3309,12 @@ function createCornerKneeBraceParts(
       if (!geometry) {
         throw new Error("Unable to create top-frame corner-brace geometry");
       }
+      assignDirectionalWoodUvs(
+        geometry,
+        new THREE.Vector3(endSign, -sideSign, 0),
+        textureSize,
+        `${endSign < 0 ? "left" : "right"}-${sideSign < 0 ? "front" : "back"}-top-frame-knee-brace`,
+      );
       return geometry;
     }),
   );
@@ -3386,17 +3365,24 @@ function mergeGeometryList(
   geometries: THREE.BufferGeometry[],
   errorMessage: string,
 ) {
-  const nonIndexed = geometries.map((geometry) =>
-    geometry.index ? geometry.toNonIndexed() : geometry,
-  );
+  const nonIndexed = geometries.map((geometry) => {
+    if (!geometry.index) return geometry;
+    const converted = geometry.toNonIndexed();
+    converted.userData = { ...geometry.userData };
+    return converted;
+  });
   for (const geometry of nonIndexed) {
-    addPlanarWoodUvs(geometry);
+    if (!geometry.getAttribute("uv")) addPlanarWoodUvs(geometry);
   }
   const merged = mergeGeometries(nonIndexed, false);
+  const woodGrainParts = collectWoodGrainParts(nonIndexed);
   for (const geometry of new Set([...geometries, ...nonIndexed])) {
     if (geometry !== merged) geometry.dispose();
   }
   if (!merged) throw new Error(errorMessage);
+  if (woodGrainParts.length > 0) {
+    merged.userData.woodGrainParts = woodGrainParts;
+  }
   merged.computeVertexNormals();
   merged.computeBoundingBox();
   merged.computeBoundingSphere();
@@ -3407,6 +3393,8 @@ function createHalfLappedXParts(
   brace: BracePlaneSpec,
   halfLapClearance: number,
   model: HoverDiningTableModelDefinition,
+  textureSize: number,
+  partPrefix: string,
 ) {
   const a = miteredBraceFootprint(brace, 1);
   const b = miteredBraceFootprint(brace, -1);
@@ -3470,7 +3458,7 @@ function createHalfLappedXParts(
     upperMatingZ,
     -1,
   );
-  return [
+  const members = [
     mergeGeometryList(
       braceAGeometries,
       "Unable to merge lower-half X-brace member",
@@ -3480,11 +3468,23 @@ function createHalfLappedXParts(
       "Unable to merge upper-half X-brace member",
     ),
   ];
+  members.forEach((geometry, index) => {
+    const slopeSign = index === 0 ? 1 : -1;
+    assignDirectionalWoodUvs(
+      geometry,
+      new THREE.Vector3(brace.spanX, slopeSign * brace.spanY, 0),
+      textureSize,
+      `${partPrefix}-bar-${index + 1}`,
+    );
+  });
+  return members;
 }
 
 function createStraightSupportParts(
   support: StraightSupportSpec,
   model: HoverDiningTableModelDefinition,
+  textureSize: number,
+  partPrefix: string,
 ) {
   const halfX = support.spanX / 2;
   const halfWidth = support.width / 2;
@@ -3506,7 +3506,7 @@ function createStraightSupportParts(
     zTop: support.zTop,
     halfLapDepth: support.thickness / 2,
   };
-  return support.centerYs.map((centerY) => {
+  return support.centerYs.map((centerY, index) => {
     const geometry = support.endRadius > EPSILON
       ? createSelectivelyRoundedExtrusion(
           supportRoundedRectangleProfile(
@@ -3546,6 +3546,14 @@ function createStraightSupportParts(
         ? (support.zBottom + support.zTop) / 2
         : 0,
     );
+    assignDirectionalWoodUvs(
+      geometry,
+      new THREE.Vector3(1, 0, 0),
+      textureSize,
+      support.centerYs.length === 1
+        ? partPrefix
+        : `${partPrefix}-${index + 1}`,
+    );
     return geometry;
   });
 }
@@ -3561,21 +3569,36 @@ export function createHoverDiningTableGeometry(
           spec.upperBrace,
           spec.halfLapClearance,
           model,
+          grainTextureSize(spec),
+          "upper-x",
         )
-      : createStraightSupportParts(spec.upperStretchers, model);
+      : createStraightSupportParts(
+          spec.upperStretchers,
+          model,
+          grainTextureSize(spec),
+          "upper-stretcher",
+        );
   const lowerSupports =
     spec.bottomSupportStyle === "x"
       ? createHalfLappedXParts(
           spec.lowerBrace,
           spec.halfLapClearance,
           model,
+          grainTextureSize(spec),
+          "floor-x",
         )
       : spec.bottomSupportStyle === "center-board"
-        ? createStraightSupportParts(spec.lowerCenterBoard, model)
+        ? createStraightSupportParts(
+            spec.lowerCenterBoard,
+            model,
+            grainTextureSize(spec),
+            "floor-center-board",
+          )
         : [];
   const cornerKneeBraces = createCornerKneeBraceParts(
     spec.cornerKneeBraces,
     model,
+    grainTextureSize(spec),
   );
   const geometries = [
     createTabletopGeometry(spec, model),
@@ -4139,6 +4162,22 @@ function createEndBoxFinishedPartGeometry(
     x,
   );
   geometry.translate(0, 0, spec.frameBottomZ);
+  const splay = (spec.frameBottomWidth - spec.frameTopWidth) / 2;
+  const grainDirection = position === "top" || position === "bottom"
+    ? new THREE.Vector3(0, 1, 0)
+    : new THREE.Vector3(0, position === "left" ? splay : -splay, spec.frameHeight);
+  const endLabel = x < 0 ? "left" : "right";
+  const memberLabel = position === "top"
+    ? "top-rail"
+    : position === "bottom"
+      ? "bottom-rail"
+      : `${position}-${spec.endFrameStyle === "legs" ? "leg" : "stile"}`;
+  assignDirectionalWoodUvs(
+    geometry,
+    grainDirection,
+    grainTextureSize(spec),
+    `${endLabel}-end-frame-${memberLabel}`,
+  );
   return geometry;
 }
 
@@ -4197,6 +4236,8 @@ export function createHoverDiningTableCutPartGeometry(
       spec.upperBrace,
       spec.halfLapClearance,
       model,
+      grainTextureSize(spec),
+      "upper-x",
     );
     const selectedIndex = partId === "U1" ? 0 : 1;
     geometry = geometries[selectedIndex];
@@ -4211,6 +4252,8 @@ export function createHoverDiningTableCutPartGeometry(
       spec.lowerBrace,
       spec.halfLapClearance,
       model,
+      grainTextureSize(spec),
+      "floor-x",
     );
     const selectedIndex = partId === "F1" ? 0 : 1;
     geometry = geometries[selectedIndex];
@@ -4221,28 +4264,48 @@ export function createHoverDiningTableCutPartGeometry(
     if (spec.topSupportStyle !== "stretchers") {
       throw new Error("S1 requires the upper-stretcher support layout");
     }
-    const geometries = createStraightSupportParts(spec.upperStretchers, model);
+    const geometries = createStraightSupportParts(
+      spec.upperStretchers,
+      model,
+      grainTextureSize(spec),
+      "upper-stretcher",
+    );
     geometry = geometries[0];
     geometries.slice(1).forEach((candidate) => candidate.dispose());
   } else if (partId === "K1") {
     if (!spec.cornerKneeBraces.enabled) {
       throw new Error("K1 requires open leg frames with lengthwise upper rails");
     }
-    const geometries = createCornerKneeBraceParts(spec.cornerKneeBraces, model);
+    const geometries = createCornerKneeBraceParts(
+      spec.cornerKneeBraces,
+      model,
+      grainTextureSize(spec),
+    );
     geometry = geometries[0];
     geometries.slice(1).forEach((candidate) => candidate.dispose());
   } else if (partId === "C1") {
     if (spec.bottomSupportStyle !== "center-board") {
       throw new Error("C1 requires the floor-center-board support layout");
     }
-    const geometries = createStraightSupportParts(spec.lowerCenterBoard, model);
+    const geometries = createStraightSupportParts(
+      spec.lowerCenterBoard,
+      model,
+      grainTextureSize(spec),
+      "floor-center-board",
+    );
     geometry = geometries[0];
     geometries.slice(1).forEach((candidate) => candidate.dispose());
   } else {
     throw new Error(`Unknown Hover-table cut-list item: ${partId}`);
   }
 
-  if (partId !== "H1" && partId !== "L1") addPlanarWoodUvs(geometry);
+  if (
+    partId !== "H1" &&
+    partId !== "L1" &&
+    !geometry.getAttribute("uv")
+  ) {
+    addPlanarWoodUvs(geometry);
+  }
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;
@@ -4358,6 +4421,8 @@ export function createHoverDiningTableExplodedParts(
       brace,
       spec.halfLapClearance,
       model,
+      grainTextureSize(spec),
+      category,
     );
     geometries.forEach((geometry, index) => {
       const direction = index === 0 ? -1 : 1;
@@ -4383,7 +4448,12 @@ export function createHoverDiningTableExplodedParts(
     support: StraightSupportSpec,
     category: "upper-stretcher" | "floor-center-board",
   ) => {
-    const geometries = createStraightSupportParts(support, model);
+    const geometries = createStraightSupportParts(
+      support,
+      model,
+      grainTextureSize(spec),
+      category,
+    );
     geometries.forEach((geometry, index) => {
       const separation =
         category === "upper-stretcher"
@@ -4411,6 +4481,7 @@ export function createHoverDiningTableExplodedParts(
     const braceGeometries = createCornerKneeBraceParts(
       spec.cornerKneeBraces,
       model,
+      grainTextureSize(spec),
     );
     braceGeometries.forEach((geometry, index) => {
       const endSign = index < 2 ? -1 : 1;
@@ -4438,7 +4509,9 @@ export function createHoverDiningTableExplodedParts(
   }
 
   parts.forEach((part) => {
-    if (part.material === "Oak") addPlanarWoodUvs(part.geometry);
+    if (part.material === "Oak" && !part.geometry.getAttribute("uv")) {
+      addPlanarWoodUvs(part.geometry);
+    }
   });
 
   parts.forEach((part) =>
