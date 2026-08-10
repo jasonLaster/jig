@@ -96,7 +96,7 @@ for (const required of [
   "getCircularRoundedTrapezoidDefinition",
   "straightSupportSideProfile",
   "Upper-end shoulder radius",
-  "Matched lengthwise rail top edges and ends must use the leg face-edge round-over",
+  "Matched lengthwise rail top and shoulder edges must use the leg face-edge round-over",
 ]) {
   assert.ok(source.includes(required), `shared source is missing ${required}`);
 }

@@ -300,7 +300,7 @@
     },
     {
       "key": "topSupportEdgeRadius",
-      "label": "Lengthwise rail top/end round-over",
+      "label": "Lengthwise rail top/shoulder face-edge round-over",
       "group": "Top support members",
       "default": 9.525,
       "limits": { "min": 0.79375, "max": 19.05, "step": 1.5875 }

@@ -2432,7 +2432,7 @@ test("renders The Wave across assembly and fabrication views", async ({
   const matchRailRoundover = page.getByLabel("Match the leg round-over");
   await expect(matchRailRoundover).toBeChecked();
   await expect(
-    page.getByLabel("Lengthwise rail top/end round-over in inches"),
+    page.getByLabel("Lengthwise rail top/shoulder face-edge round-over in inches"),
   ).toHaveCount(0);
   await page.getByLabel("End-box face-edge round-over in inches").fill("1/4");
   await expect(
@@ -2441,7 +2441,7 @@ test("renders The Wave across assembly and fabrication views", async ({
   await matchRailRoundover.evaluate((input: HTMLInputElement) => input.click());
   await expect(matchRailRoundover).not.toBeChecked();
   const railRoundover = page.getByLabel(
-    "Lengthwise rail top/end round-over in inches",
+    "Lengthwise rail top/shoulder face-edge round-over in inches",
   );
   await expect(railRoundover).toBeVisible();
   await railRoundover.fill("1/8");
@@ -2463,7 +2463,7 @@ test("renders The Wave across assembly and fabrication views", async ({
   await expect(page.getByLabel("Use open leg frames")).toBeChecked();
   await expect(page.getByLabel("Match the leg round-over")).not.toBeChecked();
   await expect(
-    page.getByLabel("Lengthwise rail top/end round-over in inches"),
+    page.getByLabel("Lengthwise rail top/shoulder face-edge round-over in inches"),
   ).toHaveValue("1/8");
   await expect(page.getByText(/2 open frames · 4 full-height legs/)).toBeVisible();
 

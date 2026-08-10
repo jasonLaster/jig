@@ -1080,7 +1080,7 @@ export function assertHoverDiningTableSpec(spec: HoverDiningTableSpec) {
         EPSILON)
   ) {
     throw new Error(
-      "Matched lengthwise rail top edges and ends must use the leg face-edge round-over",
+      "Matched lengthwise rail top and shoulder edges must use the leg face-edge round-over",
     );
   }
 }
