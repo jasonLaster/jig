@@ -224,6 +224,25 @@ export const listByClient = query({
   },
 });
 
+export const listStatusesByClient = query({
+  args: { clientId: v.string() },
+  handler: async (ctx, args) => {
+    const brochures = await ctx.db
+      .query("brochures")
+      .withIndex("by_client_updated", (q) => q.eq("clientId", args.clientId))
+      .order("desc")
+      .take(60);
+    return brochures.map((brochure) => ({
+      dimensions: brochure.dimensions,
+      errorMessage: brochure.errorMessage,
+      generationId: brochure.generationId,
+      modelKey: brochure.modelKey,
+      status: brochure.status,
+      updatedAt: brochure.updatedAt,
+    }));
+  },
+});
+
 export const getByGenerationId = query({
   args: { generationId: v.string() },
   handler: async (ctx, args) => {

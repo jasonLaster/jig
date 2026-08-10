@@ -28,6 +28,7 @@ This test plan describes what must be covered before a change is pushed or deplo
 | Viewer | Nonblank canvas after load, parameter or support-layout or C-channel edit, X-Hover 14–16-piece explosion, variant-aware cut sheet, and segmented routing-template preview, render mode, original overlay, zoom, cube orientation, reset, center view, and sidebar collapse. Assembly switching and live exploded/cut-list/template edits preserve camera state. |
 | Export | Download starts, file name includes model prefix and parameter keys, generated STL is non-empty, furniture-model exports retain finite nondegenerate triangles plus their scaled envelope, and each full-size routing-template STL fits the selected square plate with the requested thickness and keyed seam. |
 | Persistence | Convex schema/functions, Save, Fork, parent version link, selected-model saved-version list, saved-version open, and no arbitrary STL upload mutation. |
+| Brochures | Four CAD references are submitted once, durable jobs receive `202 Accepted`, leaving or closing the preview does not cancel backend generation, and completed four-image sets reappear from Convex history. |
 | Accessibility | Accessible labels for controls, native `select` regressions rejected, keyboard sidebar rails, mobile layout. |
 | Specifications | Product specs and audit docs stay in sync with executable coverage. |
 

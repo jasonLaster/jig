@@ -206,6 +206,15 @@ export type SavedBrochure = {
   updatedAt: number;
 };
 
+export type BrochureJob = {
+  dimensions: BrochureDimensions;
+  errorMessage?: string;
+  generationId: string;
+  modelKey: string;
+  status: "pending" | "complete" | "error";
+  updatedAt: number;
+};
+
 type BrochureRecordInput = {
   clientId: string;
   dimensions: BrochureDimensions;
@@ -927,7 +936,6 @@ async function requestDiningTableBrochure({
   images,
   model,
   params,
-  signal,
   uploads,
 }: {
   clientId: string;
@@ -935,13 +943,11 @@ async function requestDiningTableBrochure({
   images: string[];
   model: ModelDefinition;
   params: ModelParams;
-  signal: AbortSignal;
   uploads?: Array<{ kind: BrochureAssetKind; url: string }>;
 }) {
   const response = await fetch("/api/brochure", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    signal,
     body: JSON.stringify({
       assetSet: true,
       clientId,
@@ -970,6 +976,7 @@ async function requestDiningTableBrochure({
         generationId?: string;
         imageDataUrl?: string;
         model?: string;
+        status?: string;
         warnings?: string[];
       }
     | null;
@@ -977,6 +984,13 @@ async function requestDiningTableBrochure({
     throw new Error(
       payload?.error ?? `Brochure generation failed (${response.status}).`,
     );
+  }
+  if (
+    response.status === 202 &&
+    payload?.generationId === generationId &&
+    payload.status === "accepted"
+  ) {
+    return { status: "accepted" as const };
   }
   const responseAssets = payload?.assets;
   const hasCompleteAssetSet =
@@ -1019,6 +1033,7 @@ async function requestDiningTableBrochure({
   return {
     assets: hasCompleteAssetSet ? responseAssets! : legacyAsset!,
     model: payload.model,
+    status: "complete" as const,
     warnings: payload.warnings,
   };
 }
@@ -5033,11 +5048,13 @@ function getRequestedModelId() {
 
 export default function App({
   brochureClientId = getBrochureClientId(),
+  brochureJobs,
   brochurePersistence,
   convexEnabled = false,
   savedBrochures,
 }: {
   brochureClientId?: string;
+  brochureJobs?: BrochureJob[];
   brochurePersistence?: BrochurePersistence;
   convexEnabled?: boolean;
   savedBrochures?: SavedBrochure[];
@@ -5078,7 +5095,6 @@ export default function App({
     null,
   );
   const viewerRef = useRef<ViewerHandle | null>(null);
-  const brochureAbortRef = useRef<AbortController | null>(null);
   const brochureRequestRef = useRef(0);
   const brochurePendingSaveRef = useRef<PendingBrochureSave | null>(null);
   const [brochureState, setBrochureState] =
@@ -5202,7 +5218,7 @@ export default function App({
             ? getRequestedRenderQuality()
             : "standard",
         );
-        brochureAbortRef.current?.abort();
+        brochureRequestRef.current += 1;
         setBrochureState({ status: "idle" });
         setAssemblyMode(
           nextModel.viewer === "hover-dining-table-v1" ? "assembled" : "box",
@@ -5284,6 +5300,32 @@ export default function App({
     });
   }, [model, savedBrochures]);
 
+  useEffect(() => {
+    const generationId = new URLSearchParams(window.location.search).get(
+      "brochure",
+    );
+    if (!generationId || !model || !brochureJobs) return;
+    const job = brochureJobs.find(
+      (candidate) => candidate.generationId === generationId,
+    );
+    if (!job || job.status === "complete") return;
+    if (model.id !== job.modelKey) {
+      setSelectedModelId(job.modelKey);
+      return;
+    }
+    setAssemblyMode("brochure");
+    setBrochureState(
+      job.status === "error"
+        ? {
+            status: "error",
+            message:
+              job.errorMessage ??
+              "Brochure generation failed. Please try again.",
+          }
+        : { status: "generating", background: true },
+    );
+  }, [brochureJobs, model]);
+
   const startBrochureGeneration = () => {
     if (
       !model ||
@@ -5308,9 +5350,6 @@ export default function App({
     window.history.replaceState(null, "", brochureUrl);
     const requestId = brochureRequestRef.current + 1;
     brochureRequestRef.current = requestId;
-    brochureAbortRef.current?.abort();
-    const controller = new AbortController();
-    brochureAbortRef.current = controller;
     brochurePendingSaveRef.current = null;
     setBrochureState({ status: "generating" });
 
@@ -5349,10 +5388,17 @@ export default function App({
           images,
           model,
           params,
-          signal: controller.signal,
           uploads,
         });
         if (brochureRequestRef.current !== requestId) return;
+
+        if (result.status === "accepted") {
+          const url = new URL(window.location.href);
+          url.searchParams.set("brochure", generationId);
+          window.history.replaceState(null, "", url);
+          setBrochureState({ status: "generating", background: true });
+          return;
+        }
 
         if (!brochurePersistence) {
           const assets: BrochureAsset[] = result.assets.map((asset) => ({
@@ -5403,7 +5449,6 @@ export default function App({
           saved: true,
         });
       } catch (error) {
-        if (controller.signal.aborted) return;
         if (brochureRequestRef.current === requestId) {
           const message =
             error instanceof Error
@@ -5467,20 +5512,6 @@ export default function App({
     })();
   };
 
-  useEffect(() => {
-    if (assemblyMode !== "brochure") {
-      brochureAbortRef.current?.abort();
-      brochureRequestRef.current += 1;
-    }
-  }, [assemblyMode]);
-
-  useEffect(
-    () => () => {
-      brochureAbortRef.current?.abort();
-    },
-    [],
-  );
-
   const changeHoverAssemblyMode = (nextMode: AssemblyMode) => {
     if (nextMode === "brochure") {
       startBrochureGeneration();
@@ -5490,6 +5521,7 @@ export default function App({
   };
 
   const leaveBrochure = () => {
+    brochureRequestRef.current += 1;
     const url = new URL(window.location.href);
     url.searchParams.delete("brochure");
     window.history.replaceState(null, "", url);

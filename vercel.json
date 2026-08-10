@@ -2,7 +2,7 @@
   "buildCommand": "npm run build:vercel",
   "functions": {
     "api/brochure.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   }
 }

@@ -194,6 +194,46 @@ for (const model of [
   });
 }
 
+test("an accepted brochure job keeps running after leaving the preview", async ({
+  page,
+}) => {
+  let generationId = "";
+  await page.route("**/api/brochure", async (route) => {
+    const payload = route.request().postDataJSON() as {
+      generationId: string;
+    };
+    generationId = payload.generationId;
+    await route.fulfill({
+      body: JSON.stringify({
+        generationId,
+        status: "accepted",
+      }),
+      contentType: "application/json",
+      status: 202,
+    });
+  });
+
+  await page.goto("/?model=hover-dining-table&unit=in");
+  await expect(page.locator(".scene-panel canvas")).toBeVisible();
+  await page.getByRole("button", { name: "Brochures", exact: true }).click();
+  await page.getByRole("button", { name: "Generate brochure" }).click();
+
+  const brochure = page.getByTestId("hover-brochure-panel");
+  await expect(brochure).toHaveAttribute("data-status", "generating");
+  await expect(
+    brochure.getByText(
+      "You can close this tab. We’ll keep working in the background.",
+    ),
+  ).toBeVisible();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("brochure"))
+    .toBe(generationId);
+
+  await page.getByRole("button", { name: "Back to model" }).click();
+  await expect(brochure).toHaveCount(0);
+  expect(new URL(page.url()).searchParams.has("brochure")).toBe(false);
+});
+
 test("brochure mode captures four CAD angles and presents the generated image", async ({
   page,
 }) => {

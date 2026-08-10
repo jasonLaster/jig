@@ -4,6 +4,10 @@ import {
   generateImage,
   gateway,
 } from "ai";
+import { waitUntil } from "@vercel/functions";
+import { ConvexHttpClient } from "convex/browser";
+import type { Id } from "../convex/_generated/dataModel";
+import { api } from "../convex/_generated/api";
 
 const IMAGE_MODEL = "openai/gpt-image-2";
 const MAX_REFERENCE_COUNT = 4;
@@ -232,6 +236,72 @@ async function uploadBrochureAsset(
   };
 }
 
+function brochureErrorMessage(error: unknown) {
+  if (APICallError.isInstance(error) && error.statusCode === 429) {
+    return "Brochure generation is temporarily rate limited. Try again shortly.";
+  }
+  if (APICallError.isInstance(error) && error.statusCode === 402) {
+    return "The brochure generation budget is currently unavailable.";
+  }
+  if (NoImageGeneratedError.isInstance(error)) {
+    return "The image model did not return a usable brochure image.";
+  }
+  return error instanceof Error
+    ? error.message
+    : "Brochure generation failed. Please try again.";
+}
+
+function createBrochurePersistenceClient(request: BrochureRequest) {
+  const uploadUrl = new URL(request.uploads![0].url);
+  return new ConvexHttpClient(uploadUrl.origin);
+}
+
+async function generateAndPersistBrochure(
+  brochureRequest: BrochureRequest,
+  references: Uint8Array[],
+) {
+  const convex = createBrochurePersistenceClient(brochureRequest);
+  try {
+    const generatedAssets = await Promise.all(
+      BROCHURE_ASSET_SPECS.map((spec) =>
+        generateBrochureAsset(brochureRequest, references, spec.kind),
+      ),
+    );
+    const assets = await Promise.all(
+      generatedAssets.map((generated, index) =>
+        uploadBrochureAsset(brochureRequest.uploads![index], generated),
+      ),
+    );
+    const warnings = generatedAssets.flatMap(({ assetKind, result }) =>
+      result.warnings.map((warning) => `${assetKind}:${warning.type}`),
+    );
+    await convex.mutation(api.brochures.complete, {
+      assets: assets.map((asset) => ({
+        ...asset,
+        storageId: asset.storageId as Id<"_storage">,
+      })),
+      clientId: brochureRequest.clientId,
+      generationId: brochureRequest.generationId,
+      warnings,
+    });
+  } catch (error) {
+    const message = brochureErrorMessage(error);
+    console.error("Background brochure generation failed", error);
+    try {
+      await convex.mutation(api.brochures.fail, {
+        clientId: brochureRequest.clientId,
+        errorMessage: message,
+        generationId: brochureRequest.generationId,
+      });
+    } catch (persistenceError) {
+      console.error(
+        "Unable to record brochure generation failure",
+        persistenceError,
+      );
+    }
+  }
+}
+
 async function handleBrochureRequest(request: Request) {
   if (request.method !== "POST") {
     return json(
@@ -276,24 +346,11 @@ async function handleBrochureRequest(request: Request) {
           503,
         );
       }
-      const generatedAssets = await Promise.all(
-        BROCHURE_ASSET_SPECS.map((spec) =>
-          generateBrochureAsset(brochureRequest, references, spec.kind),
-        ),
-      );
-      const assets = await Promise.all(
-        generatedAssets.map((generated, index) =>
-          uploadBrochureAsset(brochureRequest.uploads![index], generated),
-        ),
-      );
+      waitUntil(generateAndPersistBrochure(brochureRequest, references));
       return json({
-        assets,
         generationId: brochureRequest.generationId,
-        model: IMAGE_MODEL,
-        warnings: generatedAssets.flatMap(({ assetKind, result }) =>
-          result.warnings.map((warning) => `${assetKind}:${warning.type}`),
-        ),
-      });
+        status: "accepted",
+      }, 202);
     }
 
     const { result } = await generateBrochureAsset(
@@ -334,7 +391,7 @@ async function handleBrochureRequest(request: Request) {
     }
     console.error("Brochure generation failed", error);
     return json(
-      { error: "Brochure generation failed. Please try again." },
+      { error: brochureErrorMessage(error) },
       500,
     );
   }

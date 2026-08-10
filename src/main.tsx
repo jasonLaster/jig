@@ -11,6 +11,7 @@ import type { Id } from "../convex/_generated/dataModel";
 import App, {
   type BrochureAsset,
   type BrochureAssetKind,
+  type BrochureJob,
   getBrochureClientId,
   type BrochurePersistence,
   type SavedBrochure,
@@ -27,6 +28,9 @@ function ConnectedApp() {
   const failBrochure = useMutation(api.brochures.fail);
   const generateUploadUrl = useMutation(api.brochures.generateUploadUrl);
   const listedBrochures = useQuery(api.brochures.listByClient, { clientId });
+  const listedBrochureJobs = useQuery(api.brochures.listStatusesByClient, {
+    clientId,
+  });
   const requestedGenerationId = new URLSearchParams(window.location.search).get(
     "brochure",
   );
@@ -106,6 +110,7 @@ function ConnectedApp() {
   return (
     <App
       brochureClientId={clientId}
+      brochureJobs={listedBrochureJobs as BrochureJob[] | undefined}
       brochurePersistence={persistence}
       convexEnabled
       savedBrochures={brochures}

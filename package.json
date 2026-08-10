@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.3.2",
+    "@vercel/functions": "^3.9.1",
     "@vitejs/plugin-react": "^5.0.0",
     "ai": "^7.0.58",
     "convex": "^1.42.1",

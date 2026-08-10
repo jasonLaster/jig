@@ -30,7 +30,7 @@ export type BrochurePanelDimensions = {
 
 export type BrochureGenerationState =
   | { status: "idle" }
-  | { status: "generating" }
+  | { status: "generating"; background?: boolean }
   | { status: "saving" }
   | {
       status: "success";
@@ -185,8 +185,9 @@ export function HoverBrochurePanel({
           <p>Brochure mode</p>
           <h2>Creating four coordinated views</h2>
           <span>
-            Using four CAD reference angles to generate two furnished room
-            scenes and two table-only product photographs.
+            {state.status === "generating" && state.background
+              ? "You can close this tab. We’ll keep working in the background."
+              : "Using four CAD reference angles to generate two furnished room scenes and two table-only product photographs."}
           </span>
           <div className="hover-brochure-progress" aria-hidden="true">
             <span />
