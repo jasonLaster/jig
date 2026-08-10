@@ -44,7 +44,7 @@ function formatProcessing(part: HoverDiningTableCutPart) {
           ? "rounded bottom long edges"
           : "square long edges";
     return shoulderRadius > 0
-      ? `circular upper-end returns · ${longEdges}`
+      ? `circular upper-end returns · independent top/end round-overs · ${longEdges}`
       : endRadius > 0
       ? `rounded end-face perimeters · flat bearing centers · ${longEdges}`
       : `square box-parallel ends · ${longEdges}`;
@@ -280,7 +280,7 @@ function ProfileFeatureLabels({
     return (
       <g className="cut-part-feature-labels">
         <text x="45" y="29">
-          Mirrored upper-end R {formatLength(shoulderRadius, unit)} · true circular
+          Mirrored upper-end R {formatLength(shoulderRadius, unit)} · end edge R {formatLength(supportEndRadius, unit)}
         </text>
       </g>
     );

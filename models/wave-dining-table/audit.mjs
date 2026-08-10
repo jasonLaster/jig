@@ -44,13 +44,14 @@ close(params.cornerBraceReach, 10 * inch, "corner-brace reach");
 assert.equal(
   params.matchLengthwiseRailRoundover,
   1,
-  "lengthwise rails must match the leg round-over by default",
+  "lengthwise rail ends must match the leg round-over by default",
 );
 close(
-  params.topSupportEdgeRadius,
+  params.topSupportEndRadius,
   params.frameEdgeRoundover,
-  "default rail/leg round-over parity",
+  "default rail-end/leg round-over parity",
 );
+close(params.topSupportEdgeRadius, 0.375 * inch, "independent top round-over");
 for (const removedBezierControl of [
   "frameOuterRailCurveTension",
   "frameOuterStileCurveTension",
@@ -96,7 +97,7 @@ for (const required of [
   "getCircularRoundedTrapezoidDefinition",
   "straightSupportSideProfile",
   "Upper-end shoulder radius",
-  "Matched lengthwise rail top and shoulder edges must use the leg face-edge round-over",
+  "Matched lengthwise rail end face-edge must use the leg round-over",
 ]) {
   assert.ok(source.includes(required), `shared source is missing ${required}`);
 }
@@ -118,7 +119,8 @@ for (const phrase of [
   "distinctive wave-shaped shoulder",
   "true circular fillets",
   "2.5 in high by 2.5 in wide lengthwise rails with mirrored 2.5 in circular upper-end returns",
-  "Match the lengthwise rails' tabletop-facing top and shoulder face edges",
+  "Top and end treatments are independent",
+  "Derive the top round-over maximum from the rail width and height",
   "two parallel lengthwise upper rails",
   "four plan-view corner knee braces",
   "no floor connector",

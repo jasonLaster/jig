@@ -351,6 +351,7 @@ const PARAM_QUERY_KEYS = [
   "topSupportThickness",
   "topSupportEndpointInset",
   "topSupportEdgeRadius",
+  "topSupportEndRadius",
   "topSupportShoulderRadius",
   "matchLengthwiseRailRoundover",
   "bottomSupportWidth",
@@ -718,6 +719,7 @@ function getParamsFromUrl(model: ModelDefinition) {
         "xBraceEdgeRadius",
         "lowerBraceEdgeRadius",
       ],
+      topSupportEndRadius: ["topSupportEdgeRadius"],
       bottomSupportEdgeRadius: [
         "lowerBraceEdgeRadius",
         "xBraceEdgeRadius",
@@ -3147,7 +3149,7 @@ function HoverDiningTableParameterControls({
               ) : group === "Top support members" ? (
                 <p className="parameter-group-description">
                   {floorMustRemainOpen
-                    ? "Dimensions for the two lengthwise rails. Mirrored circular upper-end returns echo the leg-frame shoulders; their face-edge round-over still matches the legs by default."
+                    ? "Dimensions for the two lengthwise rails. Top and end face-edge round-overs are independent; the end can still match the legs. Mirrored circular upper-end returns echo the leg-frame shoulders."
                     : "Dimensions for the selected top X or stretcher members."}
                 </p>
               ) : group === "Corner braces" ? (
@@ -3246,7 +3248,7 @@ function HoverDiningTableParameterControls({
                   );
                 }
                 if (
-                  parameter.key === "topSupportEdgeRadius" &&
+                  parameter.key === "topSupportEndRadius" &&
                   floorMustRemainOpen &&
                   getParam(params, "matchLengthwiseRailRoundover") >= 0.5
                 ) {
@@ -5568,13 +5570,12 @@ export default function App({
           model.geometry.gridfinityGridSize,
         );
       }
+      const roundedNextValue = Number(
+        nextValue.toFixed(CURVE_PARAM_KEYS.has(key) ? 3 : 1),
+      );
       const next = {
         ...current,
-        [key]: Number(
-          nextValue.toFixed(
-            CURVE_PARAM_KEYS.has(key) ? 3 : 1,
-          ),
-        ),
+        [key]: clamp(roundedNextValue, limits.min, limits.max),
       };
       const acceptValidHoverParams = (candidate: ModelParams) => {
         if (model.viewer !== "hover-dining-table-v1") return candidate;
