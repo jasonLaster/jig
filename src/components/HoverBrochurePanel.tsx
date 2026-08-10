@@ -51,10 +51,10 @@ type HoverBrochurePanelProps = {
 };
 
 const ASSET_LABELS: Record<BrochurePanelAssetKind, string> = {
-  "room-hero": "Room scene · hero",
-  "room-alternate": "Room scene · alternate",
-  "table-three-quarter": "Table only · three-quarter",
-  "table-profile": "Table only · profile",
+  "room-hero": "At home",
+  "room-alternate": "Another setting",
+  "table-three-quarter": "Three-quarter view",
+  "table-profile": "Side profile",
 };
 
 function formatInches(millimeters: number, precision = 1) {
@@ -85,7 +85,7 @@ export function HoverBrochurePanel({
   return (
     <section
       aria-busy={isGenerating}
-      aria-label="AI brochure render"
+      aria-label="Brochure preview"
       aria-live="polite"
       className="hover-brochure-panel"
       data-status={state.status}
@@ -101,7 +101,10 @@ export function HoverBrochurePanel({
           <div className="hover-brochure-specification">
             <p>{ASSET_LABELS[activeAsset.kind]}</p>
             <h2>{modelName}</h2>
-            <div aria-label="CAD dimensions" className="hover-brochure-dimensions">
+            <div
+              aria-label="Design dimensions"
+              className="hover-brochure-dimensions"
+            >
               <span>
                 <small>Length</small>
                 <strong>{formatInches(state.dimensions.length)}</strong>
@@ -142,7 +145,7 @@ export function HoverBrochurePanel({
       <div className="hover-brochure-toolbar">
         <button onClick={onBack} type="button">
           <ArrowLeft aria-hidden="true" />
-          Back to model
+          Back to design
         </button>
         {state.status === "success" && activeAsset ? (
           <>
@@ -154,24 +157,18 @@ export function HoverBrochurePanel({
               ) : (
                 <CloudOff aria-hidden="true" />
               )}
-              {state.saved ? "Saved" : "Not saved"}
+              {state.saved ? "In your library" : "Not in library"}
             </span>
-            {!state.saved ? (
-              <button onClick={onRetrySave} type="button">
-                <Save aria-hidden="true" />
-                Save again
-              </button>
-            ) : null}
             <button onClick={onRegenerate} type="button">
               <RefreshCw aria-hidden="true" />
-              Regenerate
+              Make another
             </button>
             <a
               download={`${slugify(modelName)}-${activeAsset.kind}.png`}
               href={activeAsset.imageUrl}
             >
               <Download aria-hidden="true" />
-              Download view
+              Download
             </a>
           </>
         ) : null}
@@ -182,12 +179,9 @@ export function HoverBrochurePanel({
           <span className="hover-brochure-spark" aria-hidden="true">
             <Sparkles />
           </span>
-          <p>Brochure mode</p>
-          <h2>Creating four coordinated views</h2>
-          <span>
-            Using four CAD reference angles to generate two furnished room
-            scenes and two table-only product photographs.
-          </span>
+          <p>Making brochure</p>
+          <h2>Prepare for a little whimsy</h2>
+          <span>Something lovely is taking shape.</span>
           <div className="hover-brochure-progress" aria-hidden="true">
             <span />
           </div>
@@ -199,12 +193,9 @@ export function HoverBrochurePanel({
           <span className="hover-brochure-spark" aria-hidden="true">
             <Save />
           </span>
-          <p>Brochure ready</p>
-          <h2>Saving four full-resolution views</h2>
-          <span>
-            Adding the room scenes, table-only photographs, and exact CAD
-            dimensions to the brochure library.
-          </span>
+          <p>Almost ready</p>
+          <h2>Adding the finishing touches</h2>
+          <span>Your new brochure will be ready in a moment.</span>
           <div className="hover-brochure-progress" aria-hidden="true">
             <span />
           </div>
@@ -213,9 +204,13 @@ export function HoverBrochurePanel({
 
       {state.status === "error" ? (
         <div className="hover-brochure-message error" role="alert">
-          <p>Brochure generation stopped</p>
-          <h2>Unable to create the image set</h2>
-          <span>{state.message}</span>
+          <p>A small hiccup</p>
+          <h2>That didn’t quite work</h2>
+          <span>
+            {state.retrySave
+              ? "Your brochure is ready, but we couldn’t save it to your library."
+              : "We couldn’t finish your brochure this time."}
+          </span>
           <button
             onClick={state.retrySave ? onRetrySave : onRegenerate}
             type="button"
@@ -228,11 +223,9 @@ export function HoverBrochurePanel({
 
       {state.status === "success" ? (
         <p className="hover-brochure-disclaimer">
-          {state.saved
-            ? "Saved to Brochures · "
-            : `Not saved yet${state.saveError ? `: ${state.saveError}` : ""} · `}
-          {state.assets.length} views · dimensions come from the authoritative
-          CAD model.
+          {state.saved ? "Saved to Brochures" : "Ready to download"} ·{" "}
+          {state.assets.length} {state.assets.length === 1 ? "view" : "views"} ·
+          sized from your current design.
         </p>
       ) : null}
     </section>

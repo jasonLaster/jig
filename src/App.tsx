@@ -943,7 +943,7 @@ async function requestDiningTableBrochure({
     headers: { "content-type": "application/json" },
     signal,
     body: JSON.stringify({
-      assetSet: true,
+      assetSet: uploads ? true : undefined,
       clientId,
       generationId,
       dimensions: {
@@ -4564,19 +4564,20 @@ function WorkspaceSavedBrochures({
           type="button"
         >
           <Sparkles aria-hidden="true" />
-          Generate brochure
+          Make brochure
         </button>
       ) : null}
       <div className="workspace-brochure-content">
         {!convexEnabled ? (
           <LibraryUnavailableMessage>
-            Connect Convex to save and browse generated brochures.
+            Saving isn’t available right now. You can still make and download
+            a brochure.
           </LibraryUnavailableMessage>
         ) : brochures === undefined ? (
-          <p className="library-empty">Loading brochures...</p>
+          <p className="library-empty">Gathering your brochures…</p>
         ) : visibleBrochures.length === 0 ? (
           <p className="library-empty">
-            No brochures yet. Generate the first one above.
+            A lovely blank slate. Make your first brochure above.
           </p>
         ) : (
           <div className="workspace-brochure-grid">

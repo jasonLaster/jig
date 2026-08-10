@@ -556,7 +556,7 @@ html.dark .workspace-version-row.active {
 
 .workspace-brochure-generate {
   display: inline-flex;
-  min-height: 42px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   gap: 8px;

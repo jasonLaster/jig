@@ -175,7 +175,7 @@ for (const model of [
     await page.goto(`/?model=${model.id}&unit=in`);
     await expect(page.locator(".scene-panel canvas")).toBeVisible();
     await page.getByRole("button", { name: "Brochures", exact: true }).click();
-    await page.getByRole("button", { name: "Generate brochure" }).click();
+    await page.getByRole("button", { name: "Make brochure" }).click();
     await expect
       .poll(() => requestPayload, { message: `${model.name} brochure payload` })
       .not.toBeNull();
@@ -240,10 +240,17 @@ test("brochure mode captures four CAD angles and presents the generated image", 
       .getByRole("button", { name: /brochure/i }),
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Brochures", exact: true }).click();
-  await page.getByRole("button", { name: "Generate brochure" }).click();
+  await page.getByRole("button", { name: "Make brochure" }).click();
   const brochure = page.getByTestId("hover-brochure-panel");
   await expect(viewer).toHaveAttribute("data-assembly-mode", "brochure");
   await expect(brochure).toHaveAttribute("data-status", "generating");
+  await expect(brochure.getByText("Making brochure")).toBeVisible();
+  await expect(
+    brochure.getByRole("heading", { name: "Prepare for a little whimsy" }),
+  ).toBeVisible();
+  await expect(
+    brochure.getByText("Something lovely is taking shape."),
+  ).toBeVisible();
   await expect
     .poll(() => requestPayload, { message: "brochure request payload" })
     .not.toBeNull();
@@ -253,7 +260,7 @@ test("brochure mode captures four CAD angles and presents the generated image", 
   expect(requestPayload!.clientId).toMatch(/^[a-zA-Z0-9-]{8,64}$/);
   expect(requestPayload!.generationId).toMatch(/^[a-zA-Z0-9-]{20,64}$/);
   expect(requestPayload!.images).toHaveLength(4);
-  expect((requestPayload as { assetSet?: boolean }).assetSet).toBe(true);
+  expect((requestPayload as { assetSet?: boolean }).assetSet).toBeUndefined();
   expect(
     requestPayload!.images.every((image) =>
       image.startsWith("data:image/jpeg;base64,"),
@@ -268,29 +275,29 @@ test("brochure mode captures four CAD angles and presents the generated image", 
   releaseResponse();
   await expect(brochure).toHaveAttribute("data-status", "success");
   await expect(
-    page.getByAltText("X-Hover Dining Table room scene · hero"),
+    page.getByAltText("X-Hover Dining Table at home"),
   ).toHaveAttribute("src", MOCK_BROCHURE_IMAGE);
-  await expect(page.getByRole("link", { name: "Download view" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "Download" })).toHaveAttribute(
     "download",
     "x-hover-dining-table-room-hero.png",
   );
-  await expect(page.getByLabel("CAD dimensions")).toContainText("75 in");
-  await expect(page.getByLabel("CAD dimensions")).toContainText("35.5 in");
+  await expect(page.getByLabel("Design dimensions")).toContainText("75 in");
+  await expect(page.getByLabel("Design dimensions")).toContainText("35.5 in");
   await expect(page.getByLabel("Brochure views").getByRole("button")).toHaveCount(
     4,
   );
   await page
-    .getByRole("button", { name: "Show Table only · profile" })
+    .getByRole("button", { name: "Show Side profile" })
     .click();
   await expect(
-    page.getByAltText("X-Hover Dining Table table only · profile"),
+    page.getByAltText("X-Hover Dining Table side profile"),
   ).toHaveAttribute("src", MOCK_BROCHURE_IMAGE);
   await expect(
-    page.getByText(/dimensions come from the authoritative CAD model/),
+    page.getByText(/sized from your current design/),
   ).toBeVisible();
-  await expect(page.getByText("Not saved", { exact: true })).toBeVisible();
+  await expect(page.getByText("Not in library", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "Back to model" }).click();
+  await page.getByRole("button", { name: "Back to design" }).click();
   await expect(brochure).toHaveCount(0);
   await expect(viewer).toHaveAttribute("data-assembly-mode", "assembled");
   await expect(page.locator(".orientation-cube")).toHaveAttribute(
@@ -300,6 +307,82 @@ test("brochure mode captures four CAD angles and presents the generated image", 
 
   await page.getByRole("button", { name: "Brochures", exact: true }).click();
   await expect(
-    page.getByText("Connect Convex to save and browse generated brochures."),
+    page.getByText(
+      "Saving isn’t available right now. You can still make and download a brochure.",
+    ),
   ).toBeVisible();
+});
+
+test("makes one downloadable brochure when saving is unavailable", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  let requestPayload: {
+    assetSet?: boolean;
+    generationId: string;
+    uploads?: unknown;
+  } | null = null;
+
+  await page.route("**/api/brochure", async (route) => {
+    requestPayload = route.request().postDataJSON();
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        generationId: requestPayload!.generationId,
+        imageDataUrl: MOCK_BROCHURE_IMAGE,
+        model: "openai/gpt-image-2",
+        warnings: [],
+      }),
+    });
+  });
+
+  await page.goto("/?model=dining-table&unit=in");
+  await expect(page.locator(".scene-panel canvas")).toBeVisible();
+  await page.getByRole("button", { name: "Brochures", exact: true }).click();
+  await expect(
+    page.getByText(
+      "Saving isn’t available right now. You can still make and download a brochure.",
+    ),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Make brochure" }).click();
+
+  const brochure = page.getByTestId("hover-brochure-panel");
+  await expect(brochure).toHaveAttribute("data-status", "success");
+  expect(requestPayload!.assetSet).toBeUndefined();
+  expect(requestPayload!.uploads).toBeUndefined();
+  await expect(page.getByLabel("Brochure views").getByRole("button")).toHaveCount(
+    1,
+  );
+  await expect(page.getByText("Not in library", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save again" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Download" })).toHaveAttribute(
+    "download",
+    "plate-table-room-hero.png",
+  );
+  await expect(
+    page.getByText(/1 view · sized from your current design/),
+  ).toBeVisible();
+});
+
+test("keeps the mobile Make brochure action contained and thumb-friendly", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.goto("/?model=dining-table&unit=in");
+  await expect(page.locator(".scene-panel canvas")).toBeVisible();
+  await page.getByRole("button", { name: "Open workspace navigation" }).click();
+  await page.getByRole("button", { name: "Brochures", exact: true }).click();
+
+  const makeBrochureButton = page.getByRole("button", {
+    name: "Make brochure",
+  });
+  const buttonBox = await makeBrochureButton.boundingBox();
+  expect(buttonBox?.height).toBeGreaterThanOrEqual(44);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
 });
