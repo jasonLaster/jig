@@ -2169,8 +2169,11 @@ function createEndBoxPartFabricationProfile(
 ): HoverDiningTableFabricationProfile {
   const outline = createEndBoxPartProfiles(spec)[position];
   const bounds = profileBounds(outline);
-  const profileWidth = bounds.maxX - bounds.minX;
-  const profileHeight = bounds.maxY - bounds.minY;
+  const sectionWidth = position === "top"
+    ? spec.frameTopRailHeight
+    : position === "bottom"
+      ? spec.frameBottomRailHeight
+      : spec.frameSideWidth;
   return {
     family: position === "top" || position === "bottom"
       ? "frame-rail"
@@ -2178,12 +2181,12 @@ function createEndBoxPartFabricationProfile(
     outline,
     bounds,
     section: {
-      width: Math.min(profileWidth, profileHeight),
+      width: sectionWidth,
       thickness: spec.frameDepth,
       radius: spec.frameEdgeRoundover,
       label: "face-edge round-over",
       outline: roundedRectangleProfile(
-        Math.min(profileWidth, profileHeight),
+        sectionWidth,
         spec.frameDepth,
         spec.frameEdgeRoundover,
       ),
@@ -3933,6 +3936,8 @@ export function getHoverDiningTableCutList(
         "Tangent seams remain square for the leg glue joints.",
       ],
       processDimensions: [
+        { label: "Straight rail height", value: spec.frameTopRailHeight },
+        { label: "Routed profile envelope", value: topRailWidth },
         { label: "Outer top radius", value: spec.frameOuterTopCornerRadius },
         { label: "Inner top radius", value: spec.frameInnerTopCornerRadius },
         { label: "Face-edge round-over", value: spec.frameEdgeRoundover },
@@ -4007,6 +4012,8 @@ export function getHoverDiningTableCutList(
         "The floor edge remains flat while the curved returns terminate at the stile seams.",
       ],
       processDimensions: [
+        { label: "Straight rail height", value: spec.frameBottomRailHeight },
+        { label: "Routed profile envelope", value: bottomRailWidth },
         { label: "Outer bottom radius", value: spec.frameOuterBottomCornerRadius },
         { label: "Inner bottom radius", value: spec.frameInnerBottomCornerRadius },
         { label: "Face-edge round-over", value: spec.frameEdgeRoundover },

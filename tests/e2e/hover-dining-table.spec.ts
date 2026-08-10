@@ -346,6 +346,26 @@ test("builds The Wave with four top-frame corner triangles", () => {
     outerRadius: fullSize.frameOuterTopCornerRadius,
     innerRadius: fullSize.frameInnerTopCornerRadius,
   });
+  expect(topRail.fabricationProfile.section.width).toBeCloseTo(
+    fullSize.frameTopRailHeight,
+    6,
+  );
+  expect(topRail.fabricationProfile.section.thickness).toBeCloseTo(
+    fullSize.frameDepth,
+    6,
+  );
+  expect(topRail.width).toBeCloseTo(
+    fullSize.frameTopRailHeight + fullSize.frameInnerTopCornerRadius,
+    6,
+  );
+  expect(topRail.processDimensions).toContainEqual({
+    label: "Straight rail height",
+    value: fullSize.frameTopRailHeight,
+  });
+  expect(topRail.processDimensions).toContainEqual({
+    label: "Routed profile envelope",
+    value: topRail.width,
+  });
   const railOutline = topRail.fabricationProfile.outline;
   railOutline.forEach((command, index) => {
     if (command.kind !== "arc") return;
@@ -1867,6 +1887,22 @@ test("derives a full-size finished cut schedule including four leveling feet", (
       spec.frameEdgeRoundover,
       6,
     );
+    expect(rail.fabricationProfile.section.width).toBeCloseTo(
+      top ? spec.frameTopRailHeight : spec.frameBottomRailHeight,
+      6,
+    );
+    expect(rail.fabricationProfile.section.thickness).toBeCloseTo(
+      spec.frameDepth,
+      6,
+    );
+    expect(rail.processDimensions).toContainEqual({
+      label: "Straight rail height",
+      value: top ? spec.frameTopRailHeight : spec.frameBottomRailHeight,
+    });
+    expect(rail.processDimensions).toContainEqual({
+      label: "Routed profile envelope",
+      value: rail.width,
+    });
   }
   const topRail = cutList.parts.find((part) => part.id === "B1")!;
   const bottomRail = cutList.parts.find((part) => part.id === "B2")!;
@@ -2343,6 +2379,13 @@ test("renders The Wave across assembly and fabrication views", async ({
   await expect(page.locator('.hover-cut-card[data-part-id="B3"]')).toContainText(
     "Full-height leg",
   );
+  const topRailCard = page.locator('.hover-cut-card[data-part-id="B1"]');
+  await expect(topRailCard).toContainText("Envelope H 4 1/2 in");
+  await expect(topRailCard).toContainText("Straight section");
+  await expect(topRailCard).toContainText("H 2 in × D 4 in");
+  await expect(topRailCard).toContainText("Frame depth4 in");
+  await expect(topRailCard).toContainText("Straight rail height2 in");
+  await expect(topRailCard).toContainText("Routed profile envelope4 1/2 in");
   await expect(page.locator('.hover-cut-card[data-part-id="S1"]')).toContainText(
     "rounded-end member profile",
   );

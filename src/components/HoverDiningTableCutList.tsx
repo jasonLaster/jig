@@ -194,6 +194,9 @@ function PartSection({
   const sectionMidY = (section.top + section.bottom) / 2;
   const pocketTop = part.lap?.face === "top";
   const clipId = `section-clip-${part.id}`;
+  const isFrameMember =
+    part.fabricationProfile.family === "frame-rail" ||
+    part.fabricationProfile.family === "frame-stile";
   return (
     <g
       className="cut-part-section"
@@ -209,6 +212,8 @@ function PartSection({
           ? "Lap section"
           : part.kind === "channel"
             ? "U-channel section"
+            : isFrameMember
+              ? "Straight section"
             : "Edge section"}
       </text>
       <path d={section.d} />
@@ -233,7 +238,7 @@ function PartSection({
         </>
       ) : null}
       <line x1={section.left} x2={section.left - 10} y1={section.top} y2={section.top - 9} />
-      {part.kind !== "channel" && sectionRadiusIsVisible(part) ? (
+      {part.kind !== "channel" && sectionRadiusIsVisible(part) && !isFrameMember ? (
         <text x="318" y="105">
           {part.fabricationProfile.section.radius > 0
             ? `Bottom R ${formatLength(part.fabricationProfile.section.radius, unit)}`
@@ -247,7 +252,14 @@ function PartSection({
             : ""}
         </text>
       ) : null}
-      <text x="358" y="117">{part.fabricationProfile.section.label}</text>
+      <text x="358" y={isFrameMember ? "105" : "117"}>
+        {sectionDimensionLabel(part, unit)}
+      </text>
+      <text x="358" y={isFrameMember ? "117" : "128"}>
+        {isFrameMember
+          ? `R ${formatLength(part.fabricationProfile.section.radius, unit)} face edges`
+          : part.fabricationProfile.section.label}
+      </text>
     </g>
   );
 }
@@ -299,13 +311,40 @@ function formatProcessDimension(
 }
 
 function dimensionLabel(part: HoverDiningTableCutPart) {
-  if (part.fabricationProfile.family === "frame-rail") return "profile envelope";
+  if (part.fabricationProfile.family === "frame-rail") return "routed profile envelope";
   if (part.fabricationProfile.family === "frame-stile") return "tangent-to-tangent";
   if (part.fabricationProfile.family === "brace") return "true member length";
   if (part.fabricationProfile.family === "support") return "finished member length";
   if (part.fabricationProfile.family === "channel") return "finished channel length";
   if (part.fabricationProfile.family === "leveling-foot") return "overall hardware height";
   return "finished plan";
+}
+
+function widthDimensionPrefix(part: HoverDiningTableCutPart) {
+  return part.fabricationProfile.family === "frame-rail" ? "Envelope H" : "W";
+}
+
+function thicknessLabel(part: HoverDiningTableCutPart) {
+  if (
+    part.fabricationProfile.family === "frame-rail" ||
+    part.fabricationProfile.family === "frame-stile"
+  ) {
+    return "Frame depth";
+  }
+  if (part.fabricationProfile.family === "channel") return "Channel depth";
+  if (part.fabricationProfile.family === "leveling-foot") return "Pad thickness";
+  return "Thickness";
+}
+
+function sectionDimensionLabel(part: HoverDiningTableCutPart, unit: LengthUnit) {
+  const section = part.fabricationProfile.section;
+  if (part.fabricationProfile.family === "frame-rail") {
+    return `H ${formatLength(section.width, unit)} × D ${formatLength(section.thickness, unit)}`;
+  }
+  if (part.fabricationProfile.family === "frame-stile") {
+    return `W ${formatLength(section.width, unit)} × D ${formatLength(section.thickness, unit)}`;
+  }
+  return `W ${formatLength(section.width, unit)} × T ${formatLength(section.thickness, unit)}`;
 }
 
 function lapPolygon(
@@ -392,9 +431,10 @@ function HoverCutPartDiagram({
 }) {
   const arrowId = `cut-arrow-${part.id}`;
   const grainArrowId = `grain-arrow-${part.id}`;
+  const isFrameRail = part.fabricationProfile.family === "frame-rail";
   const layout = layoutProfile(
     part.fabricationProfile,
-    { x: 45, y: 38, width: 238, height: 82 },
+    { x: 45, y: 38, width: isFrameRail ? 205 : 238, height: 82 },
   );
   const lengthY = lengthDimensionY(layout);
   const verticalDimensionX = widthDimensionX(layout);
@@ -511,7 +551,8 @@ function HoverCutPartDiagram({
             x={verticalTextX}
             y={(layout.top + layout.bottom) / 2}
           >
-            {isStile ? "L" : "W"} {formatLength(isStile ? part.length : part.width, unit)}
+            {isStile ? "L" : widthDimensionPrefix(part)}{" "}
+            {formatLength(isStile ? part.length : part.width, unit)}
           </text>
         </g>
         <g className="cut-part-view-label">
@@ -524,7 +565,7 @@ function HoverCutPartDiagram({
           <dd>{part.material}</dd>
         </div>
         <div>
-          <dt>Thickness</dt>
+          <dt>{thicknessLabel(part)}</dt>
           <dd>{formatLength(part.thickness, unit)}</dd>
         </div>
         <div>
@@ -601,6 +642,10 @@ export function HoverDiningTableCutList({
               your stock and verify critical joinery on a full-size story stick.
             </p>
             <p>
+              Profiled rails list the routed blank envelope separately from
+              the straight rail section and front-to-back frame depth.
+            </p>
+            <p>
               Each interactive 3D view uses the exact exploded-model solid;
               rotate it freely or snap to a face to inspect cuts and borders.
             </p>
@@ -631,8 +676,8 @@ export function HoverDiningTableCutList({
                 <th>Material</th>
                 <th>Qty</th>
                 <th>Length</th>
-                <th>Width</th>
-                <th>Thickness</th>
+                <th>Width / envelope</th>
+                <th>Depth / thickness</th>
                 <th>Processing</th>
               </tr>
             </thead>
