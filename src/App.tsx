@@ -351,6 +351,7 @@ const PARAM_QUERY_KEYS = [
   "topSupportThickness",
   "topSupportEndpointInset",
   "topSupportEdgeRadius",
+  "topSupportShoulderRadius",
   "matchLengthwiseRailRoundover",
   "bottomSupportWidth",
   "bottomSupportThickness",
@@ -3146,7 +3147,7 @@ function HoverDiningTableParameterControls({
               ) : group === "Top support members" ? (
                 <p className="parameter-group-description">
                   {floorMustRemainOpen
-                    ? "Dimensions for the two lengthwise rails. Their tabletop-facing top edges and end-face perimeters match the leg round-over by default."
+                    ? "Dimensions for the two lengthwise rails. Mirrored circular upper-end returns echo the leg-frame shoulders; their face-edge round-over still matches the legs by default."
                     : "Dimensions for the selected top X or stretcher members."}
                 </p>
               ) : group === "Corner braces" ? (
@@ -5652,6 +5653,22 @@ export default function App({
             current.frameTopRailHeight,
             next.topSupportThickness,
           );
+          if (
+            model.parameters.some(
+              (parameter) => parameter.key === "topSupportShoulderRadius",
+            )
+          ) {
+            const shoulderLimits = getParameterLimits(
+              model,
+              next,
+              "topSupportShoulderRadius",
+            );
+            next.topSupportShoulderRadius = clamp(
+              next.topSupportShoulderRadius,
+              shoulderLimits.min,
+              shoulderLimits.max,
+            );
+          }
         }
         if (
           key === "bottomSupportThickness" ||

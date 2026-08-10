@@ -51,6 +51,7 @@ type StraightSupportSpec = {
   edgeRadius: number;
   topEdgeRadius: number;
   endRadius: number;
+  shoulderRadius: number;
   spanX: number;
   centerYs: number[];
   placementBoundaryY?: number;
@@ -173,6 +174,7 @@ export type HoverDiningTableFabricationProfile = {
   };
   support?: {
     endRadius: number;
+    shoulderRadius: number;
   };
   tabletop?: {
     planCornerRadius: number;
@@ -379,6 +381,11 @@ function rawHoverDiningTableSpec(params: ModelParams): HoverDiningTableSpec {
     params,
     "topSupportEdgeRadius",
   );
+  const topSupportShoulderRadius = Number.isFinite(
+      params.topSupportShoulderRadius,
+    )
+    ? params.topSupportShoulderRadius
+    : 0;
   const bottomSupportWidth = getParam(params, "bottomSupportWidth");
   const bottomSupportThickness = getParam(params, "bottomSupportThickness");
   const bottomSupportEndpointInset = getParam(
@@ -569,6 +576,7 @@ function rawHoverDiningTableSpec(params: ModelParams): HoverDiningTableSpec {
       edgeRadius: lengthwiseRailBottomRadius,
       topEdgeRadius: lengthwiseRailTopRadius,
       endRadius: lengthwiseRailEndRadius,
+      shoulderRadius: topSupportShoulderRadius,
       spanX: braceSpanX,
       centerYs: [-upperStretcherCenterY, upperStretcherCenterY],
       placementBoundaryY: upperPlacementBoundaryY,
@@ -598,6 +606,7 @@ function rawHoverDiningTableSpec(params: ModelParams): HoverDiningTableSpec {
       edgeRadius: bottomSupportEdgeRadius,
       topEdgeRadius: bottomSupportTopEdgeRadius,
       endRadius: 0,
+      shoulderRadius: 0,
       spanX: braceSpanX,
       centerYs: [0],
       zBottom: levelingFootExtension,
@@ -731,6 +740,7 @@ function assertStraightSupport(
   assertNonNegative(support.edgeRadius, `${label} bottom edge radius`);
   assertNonNegative(support.topEdgeRadius, `${label} top edge radius`);
   assertNonNegative(support.endRadius, `${label} end-face edge radius`);
+  assertNonNegative(support.shoulderRadius, `${label} upper-end radius`);
   assertNonNegative(support.endpointInset, `${label} endpoint inset`);
   if (support.centerYs.length !== support.count) {
     throw new Error(`${label} must retain its declared piece count`);
@@ -750,6 +760,12 @@ function assertStraightSupport(
   }
   if (support.endRadius * 2 >= support.spanX) {
     throw new Error(`${label} end radius must preserve a flat longitudinal run`);
+  }
+  if (support.shoulderRadius > support.thickness + EPSILON) {
+    throw new Error(`${label} upper-end radius cannot exceed its height`);
+  }
+  if (support.shoulderRadius * 2 >= support.spanX) {
+    throw new Error(`${label} upper-end radii must preserve a flat top run`);
   }
   const placementBoundaryY = support.placementBoundaryY;
   if (
@@ -1102,6 +1118,7 @@ function scaleStraightSupport(
     edgeRadius: support.edgeRadius / scale,
     topEdgeRadius: support.topEdgeRadius / scale,
     endRadius: support.endRadius / scale,
+    shoulderRadius: support.shoulderRadius / scale,
     spanX: support.spanX / scale,
     centerYs: support.centerYs.map((centerY) => centerY / scale),
     placementBoundaryY:
@@ -1813,6 +1830,69 @@ function supportRoundedRectangleProfile(
     });
   }
   commands.push({ kind: "close" });
+  return commands;
+}
+
+function straightSupportSideProfile(
+  support: StraightSupportSpec,
+): HoverDiningTableProfileCommand[] {
+  const halfLength = support.spanX / 2;
+  const halfHeight = support.thickness / 2;
+  const radius = Math.min(support.shoulderRadius, support.thickness);
+  if (radius <= EPSILON) {
+    return rectangleProfile(support.spanX, support.thickness);
+  }
+  const bottom = -halfHeight;
+  const top = halfHeight;
+  const right = halfLength;
+  const left = -halfLength;
+  const commands: HoverDiningTableProfileCommand[] = [
+    { kind: "move", to: { x: left, y: bottom } },
+    {
+      kind: "line",
+      to: { x: right, y: bottom },
+      edgeTreatment: "square",
+    },
+  ];
+  if (support.thickness - radius > EPSILON) {
+    commands.push({
+      kind: "line",
+      to: { x: right, y: top - radius },
+      edgeTreatment: "square",
+    });
+  }
+  commands.push(
+    {
+      kind: "arc",
+      center: { x: right - radius, y: top - radius },
+      radius,
+      startAngle: 0,
+      endAngle: Math.PI / 2,
+      clockwise: false,
+      to: { x: right - radius, y: top },
+    },
+    {
+      kind: "line",
+      to: { x: left + radius, y: top },
+    },
+    {
+      kind: "arc",
+      center: { x: left + radius, y: top - radius },
+      radius,
+      startAngle: Math.PI / 2,
+      endAngle: Math.PI,
+      clockwise: false,
+      to: { x: left, y: top - radius },
+    },
+  );
+  if (support.thickness - radius > EPSILON) {
+    commands.push({
+      kind: "line",
+      to: { x: left, y: bottom },
+      edgeTreatment: "square",
+    });
+  }
+  commands.push({ kind: "close", edgeTreatment: "square" });
   return commands;
 }
 
@@ -2532,6 +2612,19 @@ function assertFabricationProfile(
         `${label} stile must retain one or two square rail-tangent seams`,
       );
     }
+  } else if (
+    profile.family === "support" &&
+    (profile.support?.shoulderRadius ?? 0) > EPSILON
+  ) {
+    if (
+      cubicCount !== 0 ||
+      arcCount !== 2 ||
+      (squareEdgeCount !== 2 && squareEdgeCount !== 4)
+    ) {
+      throw new Error(
+        `${label} must retain two circular upper-end returns and square lower edges`,
+      );
+    }
   } else if (profile.family !== "channel" && squareEdgeCount !== 0) {
     throw new Error(`${label} contains an unexpected square profile edge`);
   }
@@ -2950,19 +3043,22 @@ function createBraceFabricationProfile(
 function createStraightSupportFabricationProfile(
   support: StraightSupportSpec,
 ): HoverDiningTableFabricationProfile {
-  const outline = support.endRadius > EPSILON
-    ? circularRoundedRectangleProfile(
-        support.spanX,
-        support.width,
-        support.endRadius,
-      )
-    : rectangleProfile(support.spanX, support.width);
+  const outline = support.shoulderRadius > EPSILON
+    ? straightSupportSideProfile(support)
+    : support.endRadius > EPSILON
+      ? circularRoundedRectangleProfile(
+          support.spanX,
+          support.width,
+          support.endRadius,
+        )
+      : rectangleProfile(support.spanX, support.width);
   return {
     family: "support",
     outline,
     bounds: profileBounds(outline),
     support: {
       endRadius: support.endRadius,
+      shoulderRadius: support.shoulderRadius,
     },
     section: {
       width: support.width,
@@ -3510,7 +3606,16 @@ function createStraightSupportParts(
     halfLapDepth: support.thickness / 2,
   };
   return support.centerYs.map((centerY, index) => {
-    const geometry = support.endRadius > EPSILON
+    const geometry = support.shoulderRadius > EPSILON
+      ? createSelectivelyRoundedExtrusion(
+          straightSupportSideProfile(support),
+          support.width,
+          support.topEdgeRadius,
+          model.geometry.curveSegments,
+          model.geometry.braceRoundoverSegments,
+          0,
+        )
+      : support.endRadius > EPSILON
       ? createSelectivelyRoundedExtrusion(
           supportRoundedRectangleProfile(
             support.width,
@@ -3542,10 +3647,20 @@ function createStraightSupportParts(
     if (!geometry) {
       throw new Error("Unable to create straight support geometry");
     }
+    if (support.shoulderRadius > EPSILON) {
+      geometry.applyMatrix4(
+        new THREE.Matrix4().set(
+          0, -1, 0, 0,
+          1, 0, 0, 0,
+          0, 0, 1, 0,
+          0, 0, 0, 1,
+        ),
+      );
+    }
     geometry.translate(
       0,
       centerY,
-      support.endRadius > EPSILON
+      support.endRadius > EPSILON || support.shoulderRadius > EPSILON
         ? (support.zBottom + support.zTop) / 2
         : 0,
     );
@@ -3763,7 +3878,9 @@ function createStraightSupportCutPart(
     fabricationProfile: createStraightSupportFabricationProfile(support),
     cutAngleDegrees: 0,
     notes: [
-      support.endRadius > EPSILON
+      support.shoulderRadius > EPSILON
+        ? "Cut mirrored circular upper-end returns into the side profile; the remaining lower end faces bear against the transverse rails."
+        : support.endRadius > EPSILON
         ? "Round over each end-face perimeter to the listed radius while preserving a flat central bearing face against the transverse rail."
         : "Square end faces bear flush on the parallel end-box inside faces.",
       support.edgeRadius > EPSILON && support.topEdgeRadius > EPSILON
@@ -3775,10 +3892,13 @@ function createStraightSupportCutPart(
             : "Leave the long edges square.",
     ],
     processDimensions: [
+      ...(support.shoulderRadius > EPSILON
+        ? [{ label: "Upper-end shoulder radius", value: support.shoulderRadius }]
+        : []),
       ...(support.edgeRadius > EPSILON
         ? [{ label: "Bottom edge round-over", value: support.edgeRadius }]
         : []),
-      ...(support.endRadius > EPSILON
+      ...(support.endRadius > EPSILON && support.shoulderRadius <= EPSILON
         ? [{ label: "End-face round-over", value: support.endRadius }]
         : []),
       ...(support.topEdgeRadius > EPSILON
@@ -4881,6 +5001,12 @@ export function getHoverDiningTableParameterLimits(
       spec.cornerKneeBraces.contactX - spec.cornerKneeBraces.width,
       spec.cornerKneeBraces.contactY - spec.cornerKneeBraces.width,
     );
+  } else if (key === "topSupportShoulderRadius") {
+    limits.max = Math.min(
+      limits.max,
+      spec.upperStretchers.thickness,
+      spec.upperStretchers.spanX / 2 - limits.step,
+    );
   } else if (key === "topSupportEdgeRadius" || key === "bottomSupportEdgeRadius") {
     const brace = key === "topSupportEdgeRadius" ? spec.upperBrace : spec.lowerBrace;
     const isCrossbar =
@@ -5842,7 +5968,7 @@ function formatBraceAngle(brace: BracePlaneSpec) {
 function topSupportAuditLabel(spec: HoverDiningTableSpec, unit: LengthUnit) {
   return spec.topSupportStyle === "x"
     ? `X · 2 × ${formatLength(spec.upperBrace.diagonalLength, unit)} at ±${formatBraceAngle(spec.upperBrace)}`
-    : `2 original lengthwise stretchers · ${formatLength(spec.upperStretchers.spanX, unit)} long · centers at ±${formatLength(Math.abs(spec.upperStretchers.centerYs[0]), unit)}${spec.cornerKneeBraces.enabled ? " · 4 corner triangles" : ""}`;
+    : `2 original lengthwise stretchers · ${formatLength(spec.upperStretchers.spanX, unit)} long × ${formatLength(spec.upperStretchers.width, unit)} wide × ${formatLength(spec.upperStretchers.thickness, unit)} high${spec.upperStretchers.shoulderRadius > EPSILON ? ` · mirrored upper-end R ${formatLength(spec.upperStretchers.shoulderRadius, unit)}` : ""} · centers at ±${formatLength(Math.abs(spec.upperStretchers.centerYs[0]), unit)}${spec.cornerKneeBraces.enabled ? " · 4 corner triangles" : ""}`;
 }
 
 function bottomSupportAuditLabel(spec: HoverDiningTableSpec, unit: LengthUnit) {
@@ -5930,7 +6056,7 @@ export function getHoverDiningTableAuditValue(
               : 0;
         return item(
           check.label,
-          `${4 + (spec.cornerKneeBraces.enabled ? 8 : 0) + bottomFaceCount} ${spec.endFrameStyle === "box" ? "box" : "frame"}-parallel support end faces · selected members stop on straight contact zones · ${formatLength(spec.upperStretchers.topEdgeRadius > EPSILON ? spec.upperStretchers.topEdgeRadius : spec.upperStretchers.edgeRadius, unit)} ${spec.upperStretchers.endRadius > EPSILON ? `${spec.upperStretchers.topEdgeRadius > EPSILON ? "top-edge" : "bottom-edge"} + end-face round-over` : `${spec.upperStretchers.topEdgeRadius > EPSILON ? "top-edge" : "bottom-edge"} round-over`}${spec.matchLengthwiseRailRoundover ? " matching legs" : ""}`,
+          `${spec.upperStretchers.shoulderRadius > EPSILON ? `2 rails with mirrored circular upper-end R ${formatLength(spec.upperStretchers.shoulderRadius, unit)} · positive rail/frame joinery required` : `${4 + bottomFaceCount} ${spec.endFrameStyle === "box" ? "box" : "frame"}-parallel support end faces · selected members stop on straight contact zones`} · ${spec.cornerKneeBraces.enabled ? "8 knee-brace contact faces · " : ""}${formatLength(spec.upperStretchers.topEdgeRadius > EPSILON ? spec.upperStretchers.topEdgeRadius : spec.upperStretchers.edgeRadius, unit)} ${spec.upperStretchers.endRadius > EPSILON ? `${spec.upperStretchers.topEdgeRadius > EPSILON ? "top-edge" : "bottom-edge"} + shoulder face-edge round-over` : `${spec.upperStretchers.topEdgeRadius > EPSILON ? "top-edge" : "bottom-edge"} round-over`}${spec.matchLengthwiseRailRoundover ? " matching legs" : ""}`,
         );
       }
     case "hoverHalfLaps":

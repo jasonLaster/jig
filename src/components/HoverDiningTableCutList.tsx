@@ -33,6 +33,7 @@ function formatProcessing(part: HoverDiningTableCutPart) {
   }
   if (part.kind === "support") {
     const endRadius = part.fabricationProfile.support?.endRadius ?? 0;
+    const shoulderRadius = part.fabricationProfile.support?.shoulderRadius ?? 0;
     const bottomRadius = part.fabricationProfile.section.radius;
     const topRadius = part.fabricationProfile.section.topRadius ?? 0;
     const longEdges = topRadius > 0 && bottomRadius > 0
@@ -42,7 +43,9 @@ function formatProcessing(part: HoverDiningTableCutPart) {
         : bottomRadius > 0
           ? "rounded bottom long edges"
           : "square long edges";
-    return endRadius > 0
+    return shoulderRadius > 0
+      ? `circular upper-end returns · ${longEdges}`
+      : endRadius > 0
       ? `rounded end-face perimeters · flat bearing centers · ${longEdges}`
       : `square box-parallel ends · ${longEdges}`;
   }
@@ -272,6 +275,16 @@ function ProfileFeatureLabels({
   unit: LengthUnit;
 }) {
   const supportEndRadius = part.fabricationProfile.support?.endRadius ?? 0;
+  const shoulderRadius = part.fabricationProfile.support?.shoulderRadius ?? 0;
+  if (shoulderRadius > 0) {
+    return (
+      <g className="cut-part-feature-labels">
+        <text x="45" y="29">
+          Mirrored upper-end R {formatLength(shoulderRadius, unit)} · true circular
+        </text>
+      </g>
+    );
+  }
   if (supportEndRadius > 0) {
     return (
       <g className="cut-part-feature-labels">
@@ -321,7 +334,9 @@ function dimensionLabel(part: HoverDiningTableCutPart) {
 }
 
 function widthDimensionPrefix(part: HoverDiningTableCutPart) {
-  return part.fabricationProfile.family === "frame-rail" ? "Envelope H" : "W";
+  if (part.fabricationProfile.family === "frame-rail") return "Envelope H";
+  if ((part.fabricationProfile.support?.shoulderRadius ?? 0) > 0) return "H";
+  return "W";
 }
 
 function thicknessLabel(part: HoverDiningTableCutPart) {
@@ -383,8 +398,9 @@ function sectionRadiusIsVisible(part: HoverDiningTableCutPart) {
 
 function shouldShowProfileFeatureLabels(part: HoverDiningTableCutPart) {
   return Boolean(
-    part.fabricationProfile.bezier ||
+      part.fabricationProfile.bezier ||
       part.fabricationProfile.cornerRadii ||
+      (part.fabricationProfile.support?.shoulderRadius ?? 0) > 0 ||
       (part.fabricationProfile.support?.endRadius ?? 0) > 0,
   );
 }
@@ -406,7 +422,9 @@ function profileLabel(part: HoverDiningTableCutPart) {
     case "brace":
       return "mitered plan profile";
     case "support":
-      return (part.fabricationProfile.support?.endRadius ?? 0) > 0
+      return (part.fabricationProfile.support?.shoulderRadius ?? 0) > 0
+        ? "circular upper-end side profile"
+        : (part.fabricationProfile.support?.endRadius ?? 0) > 0
         ? "rounded-end member profile"
         : "square-ended member profile";
     case "channel":
@@ -441,6 +459,8 @@ function HoverCutPartDiagram({
   const verticalTextX = verticalDimensionX + 18;
   const lapCenterX = (layout.left + layout.right) / 2;
   const isStile = part.fabricationProfile.family === "frame-stile";
+  const isShoulderedSupport =
+    (part.fabricationProfile.support?.shoulderRadius ?? 0) > 0;
   const hasGrain = part.grainDirection !== "n/a";
   return (
     <article
@@ -552,7 +572,14 @@ function HoverCutPartDiagram({
             y={(layout.top + layout.bottom) / 2}
           >
             {isStile ? "L" : widthDimensionPrefix(part)}{" "}
-            {formatLength(isStile ? part.length : part.width, unit)}
+            {formatLength(
+              isStile
+                ? part.length
+                : isShoulderedSupport
+                  ? part.thickness
+                  : part.width,
+              unit,
+            )}
           </text>
         </g>
         <g className="cut-part-view-label">
@@ -571,7 +598,9 @@ function HoverCutPartDiagram({
         <div>
           <dt>End cut</dt>
           <dd>
-            {(part.fabricationProfile.support?.endRadius ?? 0) > 0
+            {(part.fabricationProfile.support?.shoulderRadius ?? 0) > 0
+              ? `upper return R ${formatLength(part.fabricationProfile.support!.shoulderRadius, unit)}`
+              : (part.fabricationProfile.support?.endRadius ?? 0) > 0
               ? `square core · perimeter R ${formatLength(part.fabricationProfile.support!.endRadius, unit)}`
               : formatAngle(part.cutAngleDegrees)}
           </dd>

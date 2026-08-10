@@ -271,6 +271,9 @@ test("builds The Wave with four top-frame corner triangles", () => {
     fullSize.frameEdgeRoundover,
     6,
   );
+  expect(fullSize.upperStretchers.width).toBeCloseTo(2.5 * 25.4, 6);
+  expect(fullSize.upperStretchers.thickness).toBeCloseTo(2.5 * 25.4, 6);
+  expect(fullSize.upperStretchers.shoulderRadius).toBeCloseTo(2.5 * 25.4, 6);
   expect(fullSize.levelingFeet.enabled).toBe(true);
   expect(fullSize.cornerKneeBraces.enabled).toBe(true);
   expect(fullSize.cornerKneeBraces.count).toBe(4);
@@ -310,14 +313,18 @@ test("builds The Wave with four top-frame corner triangles", () => {
     fullSize.frameEdgeRoundover,
     6,
   );
+  expect(lengthwiseRail.fabricationProfile.support?.shoulderRadius).toBeCloseTo(
+    2.5 * 25.4,
+    6,
+  );
   expect(
     lengthwiseRail.fabricationProfile.outline.filter(
       (command) => command.kind === "arc",
     ),
-  ).toHaveLength(4);
+  ).toHaveLength(2);
   expect(lengthwiseRail.processDimensions).toContainEqual({
-    label: "End-face round-over",
-    value: fullSize.frameEdgeRoundover,
+    label: "Upper-end shoulder radius",
+    value: 2.5 * 25.4,
   });
   expect(lengthwiseRail.processDimensions).toContainEqual({
     label: "Top edge round-over",
@@ -2411,6 +2418,17 @@ test("renders The Wave across assembly and fabrication views", async ({
     .locator(".parameter-group")
     .filter({ has: page.getByRole("heading", { name: "Top support members" }) });
   await topSupportGroup.locator(".parameter-group-toggle").click();
+  await expect(page.getByLabel("Top support width in inches")).toHaveValue("2 1/2");
+  await expect(page.getByLabel("Top support thickness in inches")).toHaveValue("2 1/2");
+  const railShoulderRadius = page.getByLabel(
+    "Lengthwise rail upper-end radius in inches",
+  );
+  await expect(railShoulderRadius).toHaveValue("2 1/2");
+  await railShoulderRadius.fill("2 1/4");
+  await expect(page).toHaveURL(/topSupportShoulderRadius=2\.248/);
+  await expect(railShoulderRadius).toHaveValue("2 1/4");
+  await railShoulderRadius.fill("2 1/2");
+  await expect(page).toHaveURL(/topSupportShoulderRadius=2\.5(?:&|$)/);
   const matchRailRoundover = page.getByLabel("Match the leg round-over");
   await expect(matchRailRoundover).toBeChecked();
   await expect(
@@ -2418,7 +2436,7 @@ test("renders The Wave across assembly and fabrication views", async ({
   ).toHaveCount(0);
   await page.getByLabel("End-box face-edge round-over in inches").fill("1/4");
   await expect(
-    page.getByText(/1\/4 in top-edge \+ end-face round-over matching legs/),
+    page.getByText(/1\/4 in top-edge \+ shoulder face-edge round-over matching legs/),
   ).toBeVisible();
   await matchRailRoundover.evaluate((input: HTMLInputElement) => input.click());
   await expect(matchRailRoundover).not.toBeChecked();
@@ -2476,10 +2494,10 @@ test("renders The Wave across assembly and fabrication views", async ({
   await expect(topRailCard).toContainText("Straight rail height2 in");
   await expect(topRailCard).toContainText("Routed profile envelope4 1/2 in");
   await expect(page.locator('.hover-cut-card[data-part-id="S1"]')).toContainText(
-    "rounded-end member profile",
+    "circular upper-end side profile",
   );
   await expect(page.locator('.hover-cut-card[data-part-id="S1"]')).toContainText(
-    "End perimeter R 1/8 in",
+    "Mirrored upper-end R 2 1/2 in",
   );
   await expect(page.locator('.hover-cut-card[data-part-id="S1"]')).toContainText(
     "Top R 1/8 in",

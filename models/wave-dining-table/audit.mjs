@@ -37,6 +37,9 @@ assert.equal(params.levelingFeetEnabled, 1, "recessed leveling feet must be enab
 close(params.frameDepth, 4 * inch, "leg-frame depth");
 close(params.frameSideWidth, 2 * inch, "leg width");
 close(params.frameTopRailHeight, 2 * inch, "wave top-rail height");
+close(params.topSupportWidth, 2.5 * inch, "lengthwise rail width");
+close(params.topSupportThickness, 2.5 * inch, "lengthwise rail height");
+close(params.topSupportShoulderRadius, 2.5 * inch, "lengthwise rail upper-end radius");
 close(params.cornerBraceReach, 10 * inch, "corner-brace reach");
 assert.equal(
   params.matchLengthwiseRailRoundover,
@@ -91,6 +94,8 @@ for (const required of [
   "cornerBraceCount",
   "consistent corner returns and two square tangent seams",
   "getCircularRoundedTrapezoidDefinition",
+  "straightSupportSideProfile",
+  "Upper-end shoulder radius",
   "Matched lengthwise rail top edges and ends must use the leg face-edge round-over",
 ]) {
   assert.ok(source.includes(required), `shared source is missing ${required}`);
@@ -112,7 +117,8 @@ for (const phrase of [
   "two open transverse frames",
   "distinctive wave-shaped shoulder",
   "true circular fillets",
-  "Match the lengthwise rails' tabletop-facing top edges and end-face perimeters",
+  "2.5 in high by 2.5 in wide lengthwise rails with mirrored 2.5 in circular upper-end returns",
+  "Match the lengthwise rails' tabletop-facing top and shoulder face edges",
   "two parallel lengthwise upper rails",
   "four plan-view corner knee braces",
   "no floor connector",
