@@ -87,6 +87,13 @@ export {
   createHoverDiningTableTemplateSegments,
   getHoverDiningTableTemplateSummary,
 } from "./hoverDiningTableTemplates";
+export {
+  createVinnyTableHardwareGeometries,
+  createVinnyTableWoodGeometry,
+  getVinnyTableCutList,
+  getVinnyTableStructuralAssessment,
+} from "./vinnyTable";
+export type { VinnyCutPart } from "./vinnyTable";
 export { getDefaultParams, getParam, getParameter } from "./shared";
 export type {
   AuditItem,

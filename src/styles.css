@@ -1440,6 +1440,35 @@ html.dark .viewer-status span {
   white-space: nowrap;
 }
 
+[data-testid="vinny-cut-list"] .hover-cut-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+[data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(1) {
+  width: 27%;
+}
+
+[data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(2) {
+  width: 6%;
+}
+
+[data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(3),
+[data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(4),
+[data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(5) {
+  width: 10%;
+}
+
+[data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(6) {
+  width: 37%;
+}
+
+[data-testid="vinny-cut-list"] .hover-cut-table th:last-child,
+[data-testid="vinny-cut-list"] .hover-cut-table td:last-child {
+  white-space: normal;
+  line-height: 1.4;
+}
+
 .hover-cut-table th:last-child,
 .hover-cut-table td:last-child {
   border-right: 0;
@@ -2285,6 +2314,24 @@ html.dark .panel-section:nth-child(even) {
   color: var(--muted-strong);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.vinny-style-controls {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.vinny-style-controls label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.vinny-style-controls [data-slot="select-trigger"] {
+  width: 100%;
 }
 
 .hover-brochure-panel {

@@ -1,0 +1,92 @@
+{
+  "id": "vinny-table",
+  "name": "Vinny Table",
+  "subtitle": "Plan-derived corner-leg dining table",
+  "description": "A parametric 1:10 solid-oak model of the 96 × 40 inch Vinny dining table, with a flush shadow-groove top, mitered L-shaped advanced legs, a closed apron frame, three cross stretchers, documented alternate leg and top styles, and optional independent leveling feet.",
+  "viewer": "dining-table-v1",
+  "stl": {
+    "fileName": "vinny-table.stl",
+    "sourceName": "procedural-vinny-table-default.stl",
+    "units": "mm",
+    "url": "/models/vinny-table/vinny-table.stl"
+  },
+  "export": { "filePrefix": "vinny-table" },
+  "geometry": {
+    "mainAxis": { "x": 0, "y": 0, "z": 0 },
+    "cornerSegments": 1,
+    "edgeProfileSegments": 4,
+    "channelCount": 0
+  },
+  "parameters": [
+    { "key": "mockScale", "label": "Mock scale denominator", "group": "Overall", "statusLabel": "Scale 1:", "default": 10, "limits": { "min": 6, "max": 24, "step": 1 } },
+    { "key": "tableLength", "label": "Table length", "group": "Overall", "statusLabel": "Length", "default": 2438.4, "limits": { "min": 1828.8, "max": 3048, "step": 25.4 } },
+    { "key": "tableWidth", "label": "Table width", "group": "Overall", "statusLabel": "Width", "default": 1016, "limits": { "min": 812.8, "max": 1219.2, "step": 25.4 } },
+    { "key": "overallHeight", "label": "Overall height", "group": "Overall", "statusLabel": "Height", "default": 762, "limits": { "min": 711.2, "max": 812.8, "step": 6.35 } },
+    { "key": "topThickness", "label": "Tabletop thickness", "group": "Tabletop", "default": 38.1, "limits": { "min": 31.75, "max": 50.8, "step": 3.175 } },
+    { "key": "topStyle", "label": "Top style", "group": "Tabletop", "default": 0, "limits": { "min": 0, "max": 1, "step": 1 } },
+    { "key": "topOverhang", "label": "Top overhang", "group": "Tabletop", "default": 38.1, "limits": { "min": 12.7, "max": 76.2, "step": 3.175 } },
+    { "key": "flushGrooveWidth", "label": "Flush shadow-groove width", "group": "Tabletop", "default": 12.7, "limits": { "min": 3.175, "max": 25.4, "step": 3.175 } },
+    { "key": "flushGrooveDepth", "label": "Flush shadow-groove depth", "group": "Tabletop", "default": 6.35, "limits": { "min": 3.175, "max": 12.7, "step": 1.5875 } },
+    { "key": "legStyle", "label": "Leg style", "group": "Legs", "default": 2, "limits": { "min": 0, "max": 2, "step": 1 } },
+    { "key": "advancedLegTopWidth", "label": "Advanced leg width at frame", "group": "Advanced legs", "default": 152.4, "limits": { "min": 127, "max": 177.8, "step": 3.175 } },
+    { "key": "advancedLegFootWidth", "label": "Advanced leg width at foot", "group": "Advanced legs", "default": 50.8, "limits": { "min": 44.45, "max": 76.2, "step": 3.175 } },
+    { "key": "advancedLegThickness", "label": "Advanced leg-half thickness", "group": "Advanced legs", "default": 38.1, "limits": { "min": 31.75, "max": 44.45, "step": 3.175 } },
+    { "key": "advancedShoulderDrop", "label": "Advanced shoulder start below frame", "group": "Advanced legs", "default": 63.5, "limits": { "min": 38.1, "max": 101.6, "step": 3.175 } },
+    { "key": "advancedShoulderRadius", "label": "Advanced shoulder radius", "group": "Advanced legs", "default": 38.1, "limits": { "min": 19.05, "max": 50.8, "step": 3.175 } },
+    { "key": "postLegTopSize", "label": "Simple/intermediate leg size", "group": "Post legs", "default": 63.5, "limits": { "min": 50.8, "max": 76.2, "step": 3.175 } },
+    { "key": "postLegFootSize", "label": "Intermediate foot size", "group": "Post legs", "default": 38.1, "limits": { "min": 31.75, "max": 50.8, "step": 3.175 } },
+    { "key": "postTaperStart", "label": "Untapered length below frame", "group": "Post legs", "default": 76.2, "limits": { "min": 50.8, "max": 127, "step": 6.35 } },
+    { "key": "memberDepth", "label": "Apron and stretcher depth", "group": "Frame", "default": 63.5, "limits": { "min": 50.8, "max": 101.6, "step": 3.175 } },
+    { "key": "advancedMemberThickness", "label": "Advanced frame thickness", "group": "Frame", "default": 38.1, "limits": { "min": 31.75, "max": 50.8, "step": 3.175 } },
+    { "key": "postMemberThickness", "label": "Simple/intermediate frame thickness", "group": "Frame", "default": 31.75, "limits": { "min": 25.4, "max": 38.1, "step": 3.175 } },
+    { "key": "advancedApronDeduction", "label": "Advanced apron length deduction", "group": "Frame relationships", "default": 304.8, "limits": { "min": 254, "max": 355.6, "step": 6.35 } },
+    { "key": "postApronDeduction", "label": "Post-style apron length deduction", "group": "Frame relationships", "default": 127, "limits": { "min": 101.6, "max": 152.4, "step": 6.35 } },
+    { "key": "advancedStretcherDeduction", "label": "Advanced stretcher length deduction", "group": "Frame relationships", "default": 76.2, "limits": { "min": 50.8, "max": 101.6, "step": 6.35 } },
+    { "key": "postStretcherDeduction", "label": "Post-style stretcher length deduction", "group": "Frame relationships", "default": 63.5, "limits": { "min": 50.8, "max": 88.9, "step": 6.35 } },
+    { "key": "stretcherSpacing", "label": "Outer stretcher spacing from center", "group": "Frame", "default": 558.8, "limits": { "min": 406.4, "max": 711.2, "step": 25.4 } },
+    { "key": "levelingFeetEnabled", "label": "Use independent leveling feet", "group": "Adjustable feet", "default": 1, "limits": { "min": 0, "max": 1, "step": 1 } },
+    { "key": "levelingFootPadDiameter", "label": "Leveling-foot pad diameter", "group": "Adjustable feet", "default": 31.75, "limits": { "min": 25.4, "max": 38.1, "step": 3.175 } },
+    { "key": "levelingFootPadThickness", "label": "Leveling-foot pad thickness", "group": "Adjustable feet", "default": 12.7, "limits": { "min": 6.35, "max": 15.875, "step": 1.5875 } },
+    { "key": "levelingFootRodDiameter", "label": "Leveling-foot rod diameter", "group": "Adjustable feet", "default": 9.525, "limits": { "min": 6.35, "max": 12.7, "step": 1.5875 } },
+    { "key": "levelingFootRodLength", "label": "Leveling-foot rod length", "group": "Adjustable feet", "default": 44.45, "limits": { "min": 31.75, "max": 63.5, "step": 3.175 } },
+    { "key": "levelingFootExtension", "label": "Installed floor-to-leg extension", "group": "Adjustable feet", "default": 12.7, "limits": { "min": 6.35, "max": 25.4, "step": 1.5875 } }
+  ],
+  "audit": {
+    "toleranceMm": 0.5,
+    "dimensionTargets": [
+      "The default tabletop is 96 in long by 40 in wide by 1 1/2 in thick and the finished table is 30 in high.",
+      "The default advanced flush base uses eight 1 1/2 in thick profiled leg halves, mitered in pairs into four L-shaped corner legs.",
+      "Each advanced leg profile is 6 in wide at the frame, begins its shoulder 2 1/2 in below the top, and tapers to a 2 in foot.",
+      "All advanced aprons and stretchers are 1 1/2 in thick by 2 1/2 in deep; long aprons are table length minus 12 in, short aprons are table width minus 12 in, and stretchers are table width minus 3 in.",
+      "Three cross stretchers use the centerline plus two positions 22 in on center from it.",
+      "The flush top uses a 1/2 in wide by 1/4 in deep perimeter shadow groove; the alternate top uses a default 1 1/2 in overhang.",
+      "The documented simple and intermediate alternatives use 2 1/2 in leg blanks and 1 1/4 in thick frame members."
+    ],
+    "invariants": [
+      "Keep full-size dimensions independent from the mock scale denominator.",
+      "Derive every apron and stretcher length from the editable table and style parameters.",
+      "Keep the advanced corner legs as continuous closed L-shaped solids with mirrored curved shoulders.",
+      "Keep the simple, intermediate, and advanced leg options registered to the same base and tabletop envelope.",
+      "Keep the flush shadow groove and overhang option mutually exclusive and derived from the selected top style.",
+      "Keep the tabletop, four legs, four aprons, and three stretchers as closed printable solids.",
+      "Keep the four independent leveling feet on Z = 0 and shorten the wood while preserving overall table height.",
+      "Keep oak grain aligned lengthwise on the tabletop and long aprons, crosswise on short members, and vertically on legs.",
+      "Treat the source PDF as supplemental dimensional guidance and omit construction details that are not dimensioned.",
+      "Treat the structural panel as a geometry-only comparison and require full-size joint, racking, rocking, deflection, and repeated-load tests before build approval.",
+      "Export registered support-free wood and hardware STLs while leveling feet are enabled; disabling them restores direct wood floor contact."
+    ],
+    "checks": [
+      { "key": "tableEnvelope", "label": "Plan envelope" },
+      { "key": "tabletopProfile", "label": "Top style and shadow detail" },
+      { "key": "legGeometry", "label": "Leg style and profile" },
+      { "key": "legEndRoundovers", "label": "Floor-contact system" },
+      { "key": "cornerPlates", "label": "Apron frame" },
+      { "key": "channelLayout", "label": "Three-stretcher layout" },
+      { "key": "printEnvelope", "label": "Mock print envelope" },
+      { "key": "minimumMockFeature", "label": "Smallest mock feature" }
+    ]
+  },
+  "scripts": [
+    { "name": "audit", "path": "models/vinny-table/audit.mjs", "command": "npm run audit -- vinny-table", "description": "Validates the source dimensions, style relationships, procedural geometry, cut list, and structural-screen contract." }
+  ]
+}

@@ -5,6 +5,7 @@ export type WoodSpecies = "oak" | "walnut";
 const WOOD_SPECIES_BY_MODEL: Readonly<Partial<Record<string, WoodSpecies>>> = {
   "dining-table": "oak",
   whisperer: "oak",
+  "vinny-table": "oak",
   "hover-dining-table": "oak",
   "wave-dining-table": "oak",
 };

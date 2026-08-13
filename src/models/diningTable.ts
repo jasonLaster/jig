@@ -14,6 +14,14 @@ import {
   getWhispererTableStructuralAssessment,
   isWhispererParams,
 } from "./whispererTable";
+import {
+  createVinnyTableHardwareGeometries,
+  createVinnyTableWoodGeometry,
+  getVinnyTableAuditValue,
+  getVinnyTableParameterLimits,
+  getVinnyTableStructuralAssessment,
+  isVinnyParams,
+} from "./vinnyTable";
 import type {
   AuditCheckDefinition,
   AuditItem,
@@ -509,6 +517,9 @@ export function createDiningTableWoodGeometry(
   if (model.id === "whisperer") {
     return createWhispererTableWoodGeometry(params);
   }
+  if (model.id === "vinny-table") {
+    return createVinnyTableWoodGeometry(params);
+  }
   const levelingFeet = getPlateTableLevelingFeetSpec(params, true);
   assertPlateTableLevelingFeet(
     levelingFeet,
@@ -561,6 +572,13 @@ export function createDiningTableWoodGeometry(
 export function createDiningTableHardwareGeometries(
   params: ModelParams,
 ) {
+  if (isVinnyParams(params)) {
+    return {
+      plates: [],
+      channels: [],
+      feet: createVinnyTableHardwareGeometries(params).feet,
+    };
+  }
   if (isWhispererParams(params)) {
     return {
       plates: [],
@@ -1135,6 +1153,9 @@ function evaluatePlateTableStructure(
 export function getDiningTableStructuralAssessment(
   params: ModelParams,
 ): HoverDiningTableStructuralAssessment {
+  if (isVinnyParams(params)) {
+    return getVinnyTableStructuralAssessment(params);
+  }
   if (isWhispererParams(params)) {
     return getWhispererTableStructuralAssessment(params);
   }
@@ -1173,6 +1194,9 @@ export function getDiningTableParameterLimits(
 ): NumberLimits {
   if (model.id === "whisperer") {
     return getWhispererTableParameterLimits(model, params, key);
+  }
+  if (model.id === "vinny-table") {
+    return getVinnyTableParameterLimits(model, params, key);
   }
   const limits = { ...getParameter(model, key).limits };
   const length = getParam(params, "tableLength");
@@ -1315,6 +1339,9 @@ export function getDiningTableAuditValue(
   params: ModelParams,
   unit: LengthUnit,
 ): AuditItem {
+  if (isVinnyParams(params)) {
+    return getVinnyTableAuditValue(check, params, unit);
+  }
   if (isWhispererParams(params)) {
     return getWhispererTableAuditValue(check, params, unit);
   }

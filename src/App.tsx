@@ -63,6 +63,7 @@ import {
   SelectValue,
 } from "./components/ui/select";
 import { HoverDiningTableCutList } from "./components/HoverDiningTableCutList";
+import { VinnyTableCutList } from "./components/VinnyTableCutList";
 import {
   HoverBrochurePanel,
   type BrochureGenerationState,
@@ -414,6 +415,8 @@ const SCALAR_PARAM_KEYS = new Set([
   "syncCrossbarDimensions",
   "levelingFeetEnabled",
   "matchLengthwiseRailRoundover",
+  "legStyle",
+  "topStyle",
 ]);
 const CURVE_PARAM_KEYS = new Set([
   "topEdgeTension",
@@ -429,6 +432,8 @@ const OPTION_PARAM_KEYS = new Set([
   "syncCrossbarDimensions",
   "levelingFeetEnabled",
   "matchLengthwiseRailRoundover",
+  "legStyle",
+  "topStyle",
 ]);
 const LEG_GROOVE_PARAM_KEYS = new Set([
   "legGrooveHeight",
@@ -1362,6 +1367,11 @@ const HolderViewer = forwardRef<
         if (child instanceof THREE.Mesh) child.geometry.dispose();
       });
       diningHardwareGroup.clear();
+      const vinnyCutList =
+        model.id === "vinny-table" &&
+        latestAssemblyModeRef.current === "cut-list";
+      mainMesh.visible = !vinnyCutList;
+      diningHardwareGroup.visible = !vinnyCutList;
       const hardware = createDiningTableHardwareGeometries(
         latestParamsRef.current,
       );
@@ -2545,6 +2555,9 @@ const HolderViewer = forwardRef<
       assemblyMode === "cut-list" ? (
         <HoverDiningTableCutList model={model} params={params} unit={unit} />
       ) : null}
+      {model.id === "vinny-table" && assemblyMode === "cut-list" ? (
+        <VinnyTableCutList params={params} unit={unit} />
+      ) : null}
       {model.viewer === "hover-dining-table-v1" &&
       assemblyMode === "templates" &&
       hoverTemplateSummary ? (
@@ -2593,6 +2606,9 @@ const HolderViewer = forwardRef<
           <span>
             Cut list · full-size · {getHoverDiningTablePieceCount(params)} pieces
           </span>
+        ) : null}
+        {model.id === "vinny-table" && assemblyMode === "cut-list" ? (
+          <span>Cut list · full-size · live dimensions</span>
         ) : null}
         {model.viewer === "hover-dining-table-v1" &&
         assemblyMode === "templates" ? (
@@ -3466,6 +3482,79 @@ function HoverAssemblyControl({
           <span>{label}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+function VinnyAssemblyControl({
+  value,
+  onChange,
+}: {
+  value: AssemblyMode;
+  onChange: (value: AssemblyMode) => void;
+}) {
+  return (
+    <div className="segmented-control" aria-label="Vinny Table fabrication view">
+      {([
+        ["assembled", "Assembled", <Box aria-hidden="true" />],
+        ["cut-list", "Cut list", <Ruler aria-hidden="true" />],
+      ] as const).map(([mode, label, icon]) => (
+        <button
+          aria-pressed={value === mode}
+          className={value === mode ? "active" : ""}
+          data-mode={mode}
+          key={mode}
+          onClick={() => onChange(mode)}
+          type="button"
+        >
+          {icon}
+          <span>{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function VinnyStyleControls({
+  params,
+  onChange,
+}: {
+  params: ModelParams;
+  onChange: (key: string, value: number) => void;
+}) {
+  return (
+    <div className="vinny-style-controls">
+      <label>
+        <span>Leg style</span>
+        <Select
+          onValueChange={(value) => onChange("legStyle", Number(value))}
+          value={String(Math.round(getParam(params, "legStyle")))}
+        >
+          <SelectTrigger aria-label="Vinny leg style">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="2">Advanced · mitered L</SelectItem>
+            <SelectItem value="1">Intermediate · double taper</SelectItem>
+            <SelectItem value="0">Simple · square post</SelectItem>
+          </SelectContent>
+        </Select>
+      </label>
+      <label>
+        <span>Top style</span>
+        <Select
+          onValueChange={(value) => onChange("topStyle", Number(value))}
+          value={String(Math.round(getParam(params, "topStyle")))}
+        >
+          <SelectTrigger aria-label="Vinny top style">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="0">Flush · shadow groove</SelectItem>
+            <SelectItem value="1">Overhang</SelectItem>
+          </SelectContent>
+        </Select>
+      </label>
     </div>
   );
 }
@@ -5233,7 +5322,10 @@ export default function App({
         brochureRequestRef.current += 1;
         setBrochureState({ status: "idle" });
         setAssemblyMode(
-          nextModel.viewer === "hover-dining-table-v1" ? "assembled" : "box",
+          nextModel.viewer === "hover-dining-table-v1" ||
+            nextModel.id === "vinny-table"
+            ? "assembled"
+            : "box",
         );
       } catch (error) {
         if (!cancelled) {
@@ -5538,7 +5630,10 @@ export default function App({
     url.searchParams.delete("brochure");
     window.history.replaceState(null, "", url);
     setAssemblyMode(
-      model?.viewer === "hover-dining-table-v1" ? "assembled" : "box",
+      model?.viewer === "hover-dining-table-v1" ||
+        model?.id === "vinny-table"
+        ? "assembled"
+        : "box",
     );
   };
 
@@ -6213,6 +6308,19 @@ export default function App({
                     </p>
                   </section>
                 ) : null}
+                {model.id === "vinny-table" ? (
+                  <section className="panel-section assembly-panel-section">
+                    <h2>Fabrication</h2>
+                    <VinnyAssemblyControl
+                      onChange={setAssemblyMode}
+                      value={assemblyMode}
+                    />
+                    <p className="assembly-mode-note">
+                      The cut sheet follows the selected leg and top styles and
+                      every editable dimension.
+                    </p>
+                  </section>
+                ) : null}
 
                 <section className="panel-section model-controls-panel-section">
                   <h2>
@@ -6227,6 +6335,12 @@ export default function App({
                         onChange={(value) => updateParam("mockScale", value)}
                         value={getParam(params, "mockScale")}
                       />
+                      {model.id === "vinny-table" ? (
+                        <VinnyStyleControls
+                          onChange={updateParam}
+                          params={params}
+                        />
+                      ) : null}
                       {model.id === "whisperer" ? (
                         <OriginalOverlayToggle
                           checked={getParam(params, "levelingFeetEnabled") >= 0.5}
@@ -6264,6 +6378,34 @@ export default function App({
                     />
                   ) : model.parameters
                     .filter((parameter) => {
+                      if (model.id === "vinny-table") {
+                        const advanced = getParam(params, "legStyle") >= 1.5;
+                        const intermediate =
+                          getParam(params, "legStyle") >= 0.5 && !advanced;
+                        const overhang = getParam(params, "topStyle") >= 0.5;
+                        if (
+                          (!overhang && parameter.key === "topOverhang") ||
+                          (overhang &&
+                            (parameter.key === "flushGrooveWidth" ||
+                              parameter.key === "flushGrooveDepth")) ||
+                          (advanced &&
+                            (parameter.key.startsWith("postLeg") ||
+                              parameter.key === "postTaperStart" ||
+                              parameter.key === "postMemberThickness" ||
+                              parameter.key === "postApronDeduction" ||
+                              parameter.key === "postStretcherDeduction")) ||
+                          (!advanced &&
+                            (parameter.key.startsWith("advancedLeg") ||
+                              parameter.key.startsWith("advancedShoulder") ||
+                              parameter.key === "advancedMemberThickness" ||
+                              parameter.key === "advancedApronDeduction" ||
+                              parameter.key === "advancedStretcherDeduction")) ||
+                          (!intermediate &&
+                            parameter.key === "postLegFootSize")
+                        ) {
+                          return false;
+                        }
+                      }
                       if (
                         model.viewer === "dining-table-v1" &&
                         Number.isFinite(params.legGrooveEnabled) &&

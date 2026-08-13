@@ -13,6 +13,7 @@ The active catalog lives in `public/models/index.json`:
 
 - `dining-table` — Plate Table
 - `whisperer` — Whisperer
+- `vinny-table` — Vinny Table
 - `hover-dining-table` — X-Hover Dining Table
 - `wave-dining-table` — The Wave
 
