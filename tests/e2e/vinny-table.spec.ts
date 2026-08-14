@@ -94,6 +94,7 @@ test("derives the fabrication list and all documented style alternatives", () =>
   expect(advanced.find((part) => part.id === "B3")!.length).toBeCloseTo(37 * 25.4, 6);
   expect(advanced.find((part) => part.id === "B4")).toMatchObject({
     material: "Oak",
+    name: "Diagonal apron blocks",
     quantity: 4,
   });
   expect(advanced.find((part) => part.id === "B4")!.length).toBeCloseTo(
@@ -114,7 +115,7 @@ test("derives the fabrication list and all documented style alternatives", () =>
   });
   expect(intermediateParts.find((part) => part.id === "B1")!.length).toBeCloseTo(88 * 25.4, 6);
   expect(intermediateParts.find((part) => part.id === "B2")!.length).toBeCloseTo(32 * 25.4, 6);
-  expect(intermediateParts.find((part) => part.id === "B3")!.length).toBeCloseTo(34.5 * 25.4, 6);
+  expect(intermediateParts.find((part) => part.id === "B3")!.length).toBeCloseTo(34 * 25.4, 6);
 
   for (const styleParams of [
     intermediate,
@@ -133,8 +134,11 @@ test("derives the fabrication list and all documented style alternatives", () =>
   }
 });
 
-test("keeps the apron curve, edge treatments, cross supports, and diagonal braces parametric", () => {
+test("keeps direct apron dimensions, flush edge treatments, supports, and corner blocks parametric", () => {
   const params = getDefaultParams(model);
+  const parameterKeys = model.parameters.map((parameter) => parameter.key);
+  expect(model.parameters.every((parameter) => parameter.group)).toBe(true);
+  expect(parameterKeys.some((key) => key.endsWith("Deduction"))).toBe(false);
   const baselineSpec = getVinnyTableFabricationSpec(params);
   expect(baselineSpec.shoulderJoinHeight).toBeCloseTo(
     baselineSpec.apronBottomHeight,
@@ -142,7 +146,7 @@ test("keeps the apron curve, edge treatments, cross supports, and diagonal brace
   );
   const deeperApronSpec = getVinnyTableFabricationSpec({
     ...params,
-    memberDepth: params.memberDepth + 12.7,
+    apronHeight: params.apronHeight + 12.7,
   });
   expect(deeperApronSpec.shoulderJoinHeight).toBeCloseTo(
     deeperApronSpec.apronBottomHeight,
@@ -159,14 +163,117 @@ test("keeps the apron curve, edge treatments, cross supports, and diagonal brace
       tabletopCornerRadius: 3.175,
       tabletopRoundoverRadius: 0,
       legOuterCornerRadius: 0,
-      legEdgeBevel: 0,
-      apronBottomRoundoverRadius: 0,
+      legEdgeRadius: 0,
+      apronOuterBottomRoundoverRadius: 0,
     },
     model,
   );
   expect(treated.getAttribute("position").count).toBeGreaterThan(
     square.getAttribute("position").count,
   );
+
+  const treatedParts = treated.userData.woodGrainParts as Array<{
+    name: string;
+    vertexCount: number;
+    vertexStart: number;
+  }>;
+  const frontApron = treatedParts.find(
+    (part) => part.name === "long-apron-front",
+  )!;
+  const treatedPositions = treated.getAttribute("position");
+  const apronPoints = Array.from(
+    { length: frontApron.vertexCount },
+    (_, offset) => {
+      const index = frontApron.vertexStart + offset;
+      return new THREE.Vector3(
+        treatedPositions.getX(index),
+        treatedPositions.getY(index),
+        treatedPositions.getZ(index),
+      );
+    },
+  );
+  const scale = params.mockScale;
+  const apronHalfLength = baselineSpec.longApronLength / scale / 2;
+  const apronBottom = baselineSpec.apronBottomHeight / scale;
+  const apronOuterY = -params.tableWidth / scale / 2;
+  const apronInnerY =
+    apronOuterY + params.apronThickness / scale;
+  const roundoverStation =
+    -apronHalfLength + params.apronOuterBottomRoundoverRadius / scale;
+  const hasPoint = (x: number, y: number, z: number) =>
+    apronPoints.some(
+      (point) =>
+        Math.abs(point.x - x) < 1e-3 &&
+        Math.abs(point.y - y) < 1e-3 &&
+        Math.abs(point.z - z) < 1e-3,
+    );
+  expect(hasPoint(-apronHalfLength, apronOuterY, apronBottom)).toBe(true);
+  expect(hasPoint(roundoverStation, apronInnerY, apronBottom)).toBe(true);
+  expect(hasPoint(roundoverStation, apronOuterY, apronBottom)).toBe(false);
+
+  const leftFrontBlock = treatedParts.find(
+    (part) => part.name === "diagonal-brace-left-front",
+  )!;
+  const blockPoints = Array.from(
+    { length: leftFrontBlock.vertexCount },
+    (_, offset) => {
+      const index = leftFrontBlock.vertexStart + offset;
+      return new THREE.Vector3(
+        treatedPositions.getX(index),
+        treatedPositions.getY(index),
+        treatedPositions.getZ(index),
+      );
+    },
+  );
+  const insideSideApronX =
+    -params.tableLength / scale / 2 + params.apronThickness / scale;
+  const insideLongApronY =
+    -params.tableWidth / scale / 2 + params.apronThickness / scale;
+  expect(
+    blockPoints.some((point) => Math.abs(point.x - insideSideApronX) < 1e-3),
+  ).toBe(true);
+  expect(
+    blockPoints.some((point) => Math.abs(point.y - insideLongApronY) < 1e-3),
+  ).toBe(true);
+  expect(Math.max(...blockPoints.map((point) => point.z))).toBeCloseTo(
+    baselineSpec.apronBottomHeight / scale + params.apronHeight / scale,
+    3,
+  );
+  expect(Math.min(...blockPoints.map((point) => point.z))).toBeCloseTo(
+    apronBottom,
+    3,
+  );
+
+  const asymmetricBlockParams = {
+    ...params,
+    diagonalBraceLongReach: 10 * 25.4,
+    diagonalBraceSideReach: 6 * 25.4,
+  };
+  const asymmetricBlockSpec = getVinnyTableFabricationSpec(
+    asymmetricBlockParams,
+  );
+  expect(asymmetricBlockSpec.diagonalLongAngleDegrees).toBeCloseTo(
+    Math.atan2(6, 10) * (180 / Math.PI),
+    8,
+  );
+  expect(asymmetricBlockSpec.diagonalSideAngleDegrees).toBeCloseTo(
+    90 - Math.atan2(6, 10) * (180 / Math.PI),
+    8,
+  );
+  const asymmetricGeometry = createDiningTableWoodGeometry(
+    asymmetricBlockParams,
+    model,
+  );
+  const asymmetricPositions = asymmetricGeometry.getAttribute("position");
+  expect(
+    Array.from({ length: asymmetricPositions.count }, (_, index) =>
+      [
+        asymmetricPositions.getX(index),
+        asymmetricPositions.getY(index),
+        asymmetricPositions.getZ(index),
+      ].every(Number.isFinite),
+    ).every(Boolean),
+  ).toBe(true);
 
   const channelParams = { ...params, supportMode: 1 };
   const channelWood = createDiningTableWoodGeometry(channelParams, model);
@@ -208,6 +315,7 @@ test("keeps the apron curve, edge treatments, cross supports, and diagonal brace
 
   treated.dispose();
   square.dispose();
+  asymmetricGeometry.dispose();
   channelWood.dispose();
   channelHardware.channels.forEach((geometry) => geometry.dispose());
   channelHardware.feet.forEach((geometry) => geometry.dispose());
@@ -261,21 +369,38 @@ test("loads the live Vinny model and its parameter-driven cut sheet", async ({ p
   await expect(page.getByText("Length 96 in", { exact: false }).first()).toBeVisible();
   await expect(page.getByLabel("Vinny leg style")).toContainText("Advanced");
   await expect(page.getByLabel("Vinny top style")).toContainText("Flush");
+  await expect(page.getByRole("button", { name: "Overall", exact: true })).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: "Apron", exact: true })).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByText("Apron height / board width", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Apron thickness in inches")).toBeVisible();
+  await expect(page.getByText("Apron outer-bottom roundover", { exact: true })).toBeVisible();
+  await expect(page.getByText(/deduction/i)).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Tabletop", exact: true }).click();
+  await expect(
+    page.getByText("Tabletop corner radius", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Tabletop top-edge roundover", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Legs", exact: true }).click();
+  await expect(page.getByText("Leg outside-corner radius", { exact: true })).toBeVisible();
+  await expect(page.getByText("Other leg-edge radius", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Corner blocks", exact: true }).click();
+  await expect(
+    page.getByRole("checkbox", { name: "Diagonal apron blocks" }),
+  ).toBeChecked();
+  await expect(page.getByText("Block reach along long apron", { exact: true })).toBeVisible();
+  await expect(page.getByText("Block reach along side apron", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Cross supports", exact: true }).click();
   await expect(page.getByLabel("Vinny cross-support system")).toContainText(
     "Oak stretchers",
   );
-  await expect(
-    page.getByRole("checkbox", { name: "Diagonal apron braces" }),
-  ).toBeChecked();
-  await expect(page.getByText("Tabletop corner radius", { exact: true })).toBeVisible();
-  await expect(page.getByText("Tabletop top-edge roundover", { exact: true })).toBeVisible();
-  await expect(page.getByText("Leg outside-corner radius", { exact: true })).toBeVisible();
-  await expect(page.getByText("Other leg-edge bevel", { exact: true })).toBeVisible();
-  await expect(page.getByText("Apron bottom roundover", { exact: true })).toBeVisible();
-
   await page.getByLabel("Vinny cross-support system").click();
   await page.getByRole("option", { name: "Steel C-channels" }).click();
   await expect(page).toHaveURL(/supportMode=1/);
+  await page.getByRole("button", { name: "C-channels", exact: true }).click();
   await expect(page.getByText("C-channel visible width", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Cut list" }).click();
@@ -283,7 +408,7 @@ test("loads the live Vinny model and its parameter-driven cut sheet", async ({ p
   await expect(cutList).toBeVisible();
   await expect(cutList).toContainText("Advanced leg profile halves");
   await expect(cutList).toContainText("C-channels");
-  await expect(cutList).toContainText("Diagonal apron braces");
+  await expect(cutList).toContainText("Diagonal apron blocks");
   await expect(cutList).toContainText("84 in");
   await expect(cutList).toContainText("37 in");
 

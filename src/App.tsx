@@ -3519,15 +3519,43 @@ function VinnyAssemblyControl({
   );
 }
 
-function VinnyStyleControls({
+const VINNY_PARAMETER_GROUPS = [
+  "Overall",
+  "Tabletop",
+  "Legs",
+  "Advanced legs",
+  "Post legs",
+  "Apron",
+  "Cross supports",
+  "C-channels",
+  "Corner blocks",
+  "Adjustable feet",
+] as const;
+
+function VinnyParameterGroupIcon({ group }: { group: string }) {
+  if (group === "Overall" || group === "Adjustable feet") {
+    return <SlidersHorizontal aria-hidden="true" />;
+  }
+  if (group === "Tabletop" || group === "Apron") {
+    return <Layers3 aria-hidden="true" />;
+  }
+  if (group === "Cross supports" || group === "Corner blocks") {
+    return <GitFork aria-hidden="true" />;
+  }
+  return <Box aria-hidden="true" />;
+}
+
+function VinnyParameterOptionControl({
+  parameterKey,
   params,
   onChange,
 }: {
+  parameterKey: string;
   params: ModelParams;
   onChange: (key: string, value: number) => void;
 }) {
-  return (
-    <div className="vinny-style-controls">
+  if (parameterKey === "legStyle") {
+    return (
       <label>
         <span>Leg style</span>
         <Select
@@ -3544,6 +3572,10 @@ function VinnyStyleControls({
           </SelectContent>
         </Select>
       </label>
+    );
+  }
+  if (parameterKey === "topStyle") {
+    return (
       <label>
         <span>Top style</span>
         <Select
@@ -3559,6 +3591,10 @@ function VinnyStyleControls({
           </SelectContent>
         </Select>
       </label>
+    );
+  }
+  if (parameterKey === "supportMode") {
+    return (
       <label>
         <span>Cross-support system</span>
         <Select
@@ -3574,19 +3610,174 @@ function VinnyStyleControls({
           </SelectContent>
         </Select>
       </label>
+    );
+  }
+  if (parameterKey === "diagonalBracesEnabled") {
+    return (
       <div className="vinny-brace-toggle">
         <OriginalOverlayToggle
           checked={getParam(params, "diagonalBracesEnabled") >= 0.5}
-          label="Diagonal apron braces"
+          label="Diagonal apron blocks"
           onChange={(checked) =>
             onChange("diagonalBracesEnabled", checked ? 1 : 0)
           }
         />
         <small>
-          Four braces triangulate the inside corners between the long and short
-          aprons.
+          Four calculated-angle blocks meet the square inside apron faces.
         </small>
       </div>
+    );
+  }
+  if (parameterKey === "levelingFeetEnabled") {
+    return (
+      <OriginalOverlayToggle
+        checked={getParam(params, "levelingFeetEnabled") >= 0.5}
+        label="Use independent leveling feet"
+        onChange={(checked) =>
+          onChange("levelingFeetEnabled", checked ? 1 : 0)
+        }
+      />
+    );
+  }
+  return null;
+}
+
+function VinnyTableParameterControls({
+  model,
+  params,
+  unit,
+  onChange,
+  onUnitChange,
+}: {
+  model: ModelDefinition;
+  params: ModelParams;
+  unit: LengthUnit;
+  onChange: (key: string, value: number) => void;
+  onUnitChange: (unit: LengthUnit) => void;
+}) {
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+    () => new Set(["Overall", "Apron"]),
+  );
+  const advanced = getParam(params, "legStyle") >= 1.5;
+  const intermediate = getParam(params, "legStyle") >= 0.5 && !advanced;
+  const overhang = getParam(params, "topStyle") >= 0.5;
+  const channels = getParam(params, "supportMode") >= 0.5;
+  const diagonalBlocks = getParam(params, "diagonalBracesEnabled") >= 0.5;
+  const levelingFeet = getParam(params, "levelingFeetEnabled") >= 0.5;
+  const isVisible = (key: string) => {
+    if (!overhang && key === "topOverhang") return false;
+    if (overhang && (key === "flushGrooveWidth" || key === "flushGrooveDepth")) {
+      return false;
+    }
+    if (advanced && (key.startsWith("postLeg") || key === "postTaperStart")) {
+      return false;
+    }
+    if (!advanced && (key.startsWith("advancedLeg") || key === "advancedShoulderRadius")) {
+      return false;
+    }
+    if (!intermediate && key === "postLegFootSize") return false;
+    if (!channels && key.startsWith("cChannel")) return false;
+    if (!diagonalBlocks && key.startsWith("diagonalBrace")) return false;
+    if (!levelingFeet && key.startsWith("levelingFoot") && key !== "levelingFeetEnabled") {
+      return false;
+    }
+    return true;
+  };
+
+  return (
+    <div className="parameter-groups vinny-parameter-groups">
+      {VINNY_PARAMETER_GROUPS.map((group) => {
+        const parameters = model.parameters.filter(
+          (parameter) =>
+            parameter.group === group && isVisible(parameter.key),
+        );
+        if (parameters.length === 0) return null;
+        const groupSlug = group.toLowerCase().replace(/\s+/g, "-");
+        const headingId = `vinny-parameter-group-${groupSlug}`;
+        const contentId = `${headingId}-content`;
+        const expanded = expandedGroups.has(group);
+        return (
+          <section
+            aria-labelledby={headingId}
+            className="nested-parameter-section parameter-group"
+            data-expanded={expanded}
+            key={group}
+          >
+            <div className="divider-controls-heading">
+              <button
+                aria-controls={contentId}
+                aria-expanded={expanded}
+                className="parameter-group-toggle"
+                onClick={() => {
+                  setExpandedGroups((current) => {
+                    const next = new Set(current);
+                    if (next.has(group)) next.delete(group);
+                    else next.add(group);
+                    return next;
+                  });
+                }}
+                type="button"
+              >
+                <span className="parameter-group-icon">
+                  <VinnyParameterGroupIcon group={group} />
+                </span>
+                <h3 id={headingId}>{group}</h3>
+                <ChevronDown aria-hidden="true" />
+              </button>
+            </div>
+            <div
+              className="parameter-group-content"
+              hidden={!expanded}
+              id={contentId}
+            >
+              {group === "Apron" ? (
+                <p className="parameter-group-description">
+                  Board height (stock width) and thickness are direct controls.
+                  Long and short lengths derive from the table and leg dimensions;
+                  only the outer lower edge is rounded.
+                </p>
+              ) : group === "Corner blocks" ? (
+                <p className="parameter-group-description">
+                  Long-side and short-side reaches calculate both flush end angles.
+                </p>
+              ) : null}
+              {parameters.map((parameter) => {
+                if (OPTION_PARAM_KEYS.has(parameter.key)) {
+                  return (
+                    <VinnyParameterOptionControl
+                      key={parameter.key}
+                      onChange={onChange}
+                      parameterKey={parameter.key}
+                      params={params}
+                    />
+                  );
+                }
+                if (parameter.key === "mockScale") {
+                  return (
+                    <ScaleControl
+                      key={parameter.key}
+                      limits={getParameterLimits(model, params, parameter.key)}
+                      onChange={(value) => onChange(parameter.key, value)}
+                      value={getParam(params, parameter.key)}
+                    />
+                  );
+                }
+                return (
+                  <NumberControl
+                    key={parameter.key}
+                    label={parameter.label}
+                    limits={getParameterLimits(model, params, parameter.key)}
+                    onChange={(value) => onChange(parameter.key, value)}
+                    onUnitChange={onUnitChange}
+                    unit={unit}
+                    valueMm={params[parameter.key]}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -6362,15 +6553,11 @@ export default function App({
                   </h2>
                   {model.viewer === "dining-table-v1" ? (
                     <>
-                      <ScaleControl
-                        limits={getParameterLimits(model, params, "mockScale")}
-                        onChange={(value) => updateParam("mockScale", value)}
-                        value={getParam(params, "mockScale")}
-                      />
-                      {model.id === "vinny-table" ? (
-                        <VinnyStyleControls
-                          onChange={updateParam}
-                          params={params}
+                      {model.id !== "vinny-table" ? (
+                        <ScaleControl
+                          limits={getParameterLimits(model, params, "mockScale")}
+                          onChange={(value) => updateParam("mockScale", value)}
+                          value={getParam(params, "mockScale")}
                         />
                       ) : null}
                       {model.id === "whisperer" ? (
@@ -6390,7 +6577,8 @@ export default function App({
                           }
                         />
                       ) : null}
-                      {Number.isFinite(params.levelingFeetEnabled) ? (
+                      {model.id !== "vinny-table" &&
+                      Number.isFinite(params.levelingFeetEnabled) ? (
                         <PlateLevelingFeetToggle
                           checked={params.levelingFeetEnabled >= 0.5}
                           onChange={(checked) =>
@@ -6400,7 +6588,15 @@ export default function App({
                       ) : null}
                     </>
                   ) : null}
-                  {model.viewer === "hover-dining-table-v1" ? (
+                  {model.id === "vinny-table" ? (
+                    <VinnyTableParameterControls
+                      model={model}
+                      onChange={updateParam}
+                      onUnitChange={setUnit}
+                      params={params}
+                      unit={unit}
+                    />
+                  ) : model.viewer === "hover-dining-table-v1" ? (
                     <HoverDiningTableParameterControls
                       model={model}
                       onChange={updateParam}
@@ -6410,40 +6606,6 @@ export default function App({
                     />
                   ) : model.parameters
                     .filter((parameter) => {
-                      if (model.id === "vinny-table") {
-                        const advanced = getParam(params, "legStyle") >= 1.5;
-                        const intermediate =
-                          getParam(params, "legStyle") >= 0.5 && !advanced;
-                        const overhang = getParam(params, "topStyle") >= 0.5;
-                        const channels = getParam(params, "supportMode") >= 0.5;
-                        const diagonalBraces =
-                          getParam(params, "diagonalBracesEnabled") >= 0.5;
-                        if (
-                          (!overhang && parameter.key === "topOverhang") ||
-                          (overhang &&
-                            (parameter.key === "flushGrooveWidth" ||
-                              parameter.key === "flushGrooveDepth")) ||
-                          (advanced &&
-                            (parameter.key.startsWith("postLeg") ||
-                              parameter.key === "postTaperStart" ||
-                              parameter.key === "postMemberThickness" ||
-                              parameter.key === "postApronDeduction" ||
-                              parameter.key === "postStretcherDeduction")) ||
-                          (!advanced &&
-                            (parameter.key.startsWith("advancedLeg") ||
-                              parameter.key.startsWith("advancedShoulder") ||
-                              parameter.key === "advancedMemberThickness" ||
-                              parameter.key === "advancedApronDeduction" ||
-                              parameter.key === "advancedStretcherDeduction")) ||
-                          (!intermediate &&
-                            parameter.key === "postLegFootSize") ||
-                          (!channels && parameter.key.startsWith("cChannel")) ||
-                          (!diagonalBraces &&
-                            parameter.key === "diagonalBraceOffset")
-                        ) {
-                          return false;
-                        }
-                      }
                       if (
                         model.viewer === "dining-table-v1" &&
                         Number.isFinite(params.legGrooveEnabled) &&

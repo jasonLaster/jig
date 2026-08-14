@@ -2320,13 +2320,7 @@ html.dark .panel-section:nth-child(even) {
   line-height: 1.5;
 }
 
-.vinny-style-controls {
-  display: grid;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.vinny-style-controls label {
+.vinny-parameter-groups .parameter-group-content > label {
   display: grid;
   gap: 7px;
   color: var(--muted-strong);
@@ -2334,23 +2328,27 @@ html.dark .panel-section:nth-child(even) {
   font-weight: 780;
 }
 
-.vinny-style-controls [data-slot="select-trigger"] {
+.vinny-parameter-groups [data-slot="select-trigger"] {
   width: 100%;
 }
 
-.vinny-style-controls .vinny-brace-toggle {
+.vinny-parameter-groups .vinny-brace-toggle {
   display: grid;
   gap: 6px;
 }
 
-.vinny-style-controls .toggle-control {
+.vinny-parameter-groups .toggle-control {
   display: flex;
 }
 
-.vinny-style-controls .vinny-brace-toggle small {
+.vinny-parameter-groups .vinny-brace-toggle small {
   color: var(--muted-strong);
   font-size: 11px;
   line-height: 1.45;
+}
+
+.vinny-parameter-groups .parameter-group-description {
+  margin-left: 0;
 }
 
 .hover-brochure-panel {

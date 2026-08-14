@@ -143,7 +143,7 @@ function legHeight(params: ModelParams) {
 }
 
 function apronBottom(params: ModelParams) {
-  return topBottom(params) - memberDepth(params);
+  return topBottom(params) - apronHeight(params);
 }
 
 function rectangle(width: number, depth: number, x = 0, y = 0): Point[] {
@@ -194,7 +194,7 @@ function treatedLegRing(
   points: Point[],
   outerCornerIndex: number,
   outerRadius: number,
-  bevel: number,
+  otherRadius: number,
 ): Point[] {
   const orientation = Math.sign(polygonArea(points)) || 1;
   return points.flatMap((point, index) => {
@@ -213,64 +213,46 @@ function treatedLegRing(
     const convex = cross * orientation < -EPSILON;
     if (!convex) return [point];
 
-    if (index === outerCornerIndex) {
-      if (outerRadius <= EPSILON) return [point];
-      const angle = Math.acos(
-        THREE.MathUtils.clamp(toPrevious.dot(toNext), -1, 1),
-      );
-      const tangentDistance = Math.min(
-        outerRadius / Math.max(Math.tan(angle / 2), EPSILON),
-        previousLength * 0.45,
-        nextLength * 0.45,
-      );
-      const effectiveRadius = tangentDistance * Math.tan(angle / 2);
-      const bisector = toPrevious.clone().add(toNext).normalize();
-      const centerDistance =
-        effectiveRadius / Math.max(Math.sin(angle / 2), EPSILON);
-      const center = new THREE.Vector2(point.x, point.y).addScaledVector(
-        bisector,
-        centerDistance,
-      );
-      const start = new THREE.Vector2(point.x, point.y).addScaledVector(
-        toPrevious,
-        tangentDistance,
-      );
-      const end = new THREE.Vector2(point.x, point.y).addScaledVector(
-        toNext,
-        tangentDistance,
-      );
-      const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
-      const endAngle = Math.atan2(end.y - center.y, end.x - center.x);
-      const direction = cross < 0 ? 1 : -1;
-      let sweep = endAngle - startAngle;
-      if (direction > 0 && sweep < 0) sweep += Math.PI * 2;
-      if (direction < 0 && sweep > 0) sweep -= Math.PI * 2;
-      return Array.from({ length: PLAN_CORNER_SEGMENTS + 1 }, (_, segment) => {
-        const arcAngle =
-          startAngle + (sweep * segment) / PLAN_CORNER_SEGMENTS;
-        return {
-          x: center.x + Math.cos(arcAngle) * effectiveRadius,
-          y: center.y + Math.sin(arcAngle) * effectiveRadius,
-        };
-      });
-    }
-
-    const chamfer = Math.min(
-      Math.max(bevel, 0),
+    const requestedRadius =
+      index === outerCornerIndex ? outerRadius : otherRadius;
+    if (requestedRadius <= EPSILON) return [point];
+    const angle = Math.acos(
+      THREE.MathUtils.clamp(toPrevious.dot(toNext), -1, 1),
+    );
+    const tangentDistance = Math.min(
+      requestedRadius / Math.max(Math.tan(angle / 2), EPSILON),
       previousLength * 0.45,
       nextLength * 0.45,
     );
-    if (chamfer <= EPSILON) return [point];
-    return [
-      {
-        x: point.x + toPrevious.x * chamfer,
-        y: point.y + toPrevious.y * chamfer,
-      },
-      {
-        x: point.x + toNext.x * chamfer,
-        y: point.y + toNext.y * chamfer,
-      },
-    ];
+    const effectiveRadius = tangentDistance * Math.tan(angle / 2);
+    const bisector = toPrevious.clone().add(toNext).normalize();
+    const centerDistance =
+      effectiveRadius / Math.max(Math.sin(angle / 2), EPSILON);
+    const center = new THREE.Vector2(point.x, point.y).addScaledVector(
+      bisector,
+      centerDistance,
+    );
+    const start = new THREE.Vector2(point.x, point.y).addScaledVector(
+      toPrevious,
+      tangentDistance,
+    );
+    const end = new THREE.Vector2(point.x, point.y).addScaledVector(
+      toNext,
+      tangentDistance,
+    );
+    const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
+    const endAngle = Math.atan2(end.y - center.y, end.x - center.x);
+    const direction = cross < 0 ? 1 : -1;
+    let sweep = endAngle - startAngle;
+    if (direction > 0 && sweep < 0) sweep += Math.PI * 2;
+    if (direction < 0 && sweep > 0) sweep -= Math.PI * 2;
+    return Array.from({ length: PLAN_CORNER_SEGMENTS + 1 }, (_, segment) => {
+      const arcAngle = startAngle + (sweep * segment) / PLAN_CORNER_SEGMENTS;
+      return {
+        x: center.x + Math.cos(arcAngle) * effectiveRadius,
+        y: center.y + Math.sin(arcAngle) * effectiveRadius,
+      };
+    });
   });
 }
 
@@ -392,7 +374,7 @@ function advancedLegRing(
     ring,
     0,
     scaled(params, "legOuterCornerRadius"),
-    scaled(params, "legEdgeBevel"),
+    scaled(params, "legEdgeRadius"),
   );
 }
 
@@ -466,7 +448,7 @@ function postRing(
     ring,
     0,
     scaled(params, "legOuterCornerRadius"),
-    scaled(params, "legEdgeBevel"),
+    scaled(params, "legEdgeRadius"),
   );
 }
 
@@ -505,33 +487,50 @@ function memberCrossSection(
   thickness: number,
   depth: number,
   bottomRoundover: number,
+  roundoverSide: -1 | 0 | 1,
+  blend = 1,
 ): Point[] {
   const radius = Math.max(
     0,
     Math.min(bottomRoundover, thickness / 2, depth - EPSILON),
   );
-  if (radius <= EPSILON) return rectangle(thickness, depth);
+  if (radius <= EPSILON || roundoverSide === 0) {
+    return rectangle(thickness, depth);
+  }
+  const innerX = (-roundoverSide * thickness) / 2;
+  const outerX = (roundoverSide * thickness) / 2;
+  const bottom = -depth / 2;
+  const top = depth / 2;
+  const arcStart = new THREE.Vector2(
+    outerX - roundoverSide * radius,
+    bottom,
+  );
+  const squareCorner = new THREE.Vector2(outerX, bottom);
+  const arcEnd = new THREE.Vector2(outerX, bottom + radius);
   const points: Point[] = [
-    { x: -thickness / 2, y: depth / 2 },
+    { x: innerX, y: top },
+    { x: innerX, y: bottom },
   ];
   for (let index = 0; index <= EDGE_PROFILE_SEGMENTS; index += 1) {
-    const angle =
-      Math.PI + (index / EDGE_PROFILE_SEGMENTS) * (Math.PI / 2);
+    const progress = index / EDGE_PROFILE_SEGMENTS;
+    const angle = -Math.PI / 2 + progress * (Math.PI / 2);
+    const rounded = new THREE.Vector2(
+      outerX - roundoverSide * radius +
+        roundoverSide * Math.cos(angle) * radius,
+      bottom + radius + Math.sin(angle) * radius,
+    );
+    const squared =
+      progress <= 0.5
+        ? arcStart.clone().lerp(squareCorner, progress * 2)
+        : squareCorner.clone().lerp(arcEnd, (progress - 0.5) * 2);
+    const point = squared.lerp(rounded, blend);
     points.push({
-      x: -thickness / 2 + radius + Math.cos(angle) * radius,
-      y: -depth / 2 + radius + Math.sin(angle) * radius,
+      x: point.x,
+      y: point.y,
     });
   }
-  for (let index = 1; index <= EDGE_PROFILE_SEGMENTS; index += 1) {
-    const angle =
-      -Math.PI / 2 + (index / EDGE_PROFILE_SEGMENTS) * (Math.PI / 2);
-    points.push({
-      x: thickness / 2 - radius + Math.cos(angle) * radius,
-      y: -depth / 2 + radius + Math.sin(angle) * radius,
-    });
-  }
-  points.push({ x: thickness / 2, y: depth / 2 });
-  return points;
+  points.push({ x: outerX, y: top });
+  return roundoverSide > 0 ? points : points.reverse();
 }
 
 function createPrismaticMember(
@@ -542,45 +541,78 @@ function createPrismaticMember(
   depth: number,
   centerZ: number,
   bottomRoundover = 0,
+  roundoverSide: -1 | 0 | 1 = 0,
 ) {
   const direction = end.clone().sub(start);
   const length = direction.length();
   if (length <= EPSILON) throw new Error("Vinny frame member must have length");
   direction.normalize();
   const across = new THREE.Vector2(-direction.y, direction.x);
-  const section = memberCrossSection(thickness, depth, bottomRoundover);
+  const hasRoundover =
+    bottomRoundover > EPSILON && roundoverSide !== 0;
+  const endLand = Math.min(bottomRoundover, length / 2);
+  const stations = hasRoundover
+    ? [
+        { distance: 0, blend: 0 },
+        { distance: endLand, blend: 1 },
+        { distance: length - endLand, blend: 1 },
+        { distance: length, blend: 0 },
+      ].filter(
+        (station, index, entries) =>
+          index === 0 ||
+          Math.abs(station.distance - entries[index - 1].distance) > EPSILON,
+      )
+    : [
+        { distance: 0, blend: 0 },
+        { distance: length, blend: 0 },
+      ];
+  const sections = stations.map((station) =>
+    memberCrossSection(
+      thickness,
+      depth,
+      bottomRoundover,
+      roundoverSide,
+      station.blend,
+    ),
+  );
   const positions: number[] = [];
-  const pointAt = (endpoint: THREE.Vector2, point: Point) =>
+  const pointAt = (distance: number, point: Point) =>
     new THREE.Vector3(
-      endpoint.x + across.x * point.x,
-      endpoint.y + across.y * point.x,
+      start.x + direction.x * distance + across.x * point.x,
+      start.y + direction.y * distance + across.y * point.x,
       centerZ + point.y,
     );
-  for (let index = 0; index < section.length; index += 1) {
-    const next = (index + 1) % section.length;
-    const a = pointAt(start, section[index]);
-    const b = pointAt(end, section[index]);
-    const c = pointAt(end, section[next]);
-    const d = pointAt(start, section[next]);
-    addTriangle(positions, a, b, c);
-    addTriangle(positions, a, c, d);
+  for (let stationIndex = 0; stationIndex < stations.length - 1; stationIndex += 1) {
+    const section = sections[stationIndex];
+    const nextSection = sections[stationIndex + 1];
+    for (let index = 0; index < section.length; index += 1) {
+      const next = (index + 1) % section.length;
+      const a = pointAt(stations[stationIndex].distance, section[index]);
+      const b = pointAt(stations[stationIndex + 1].distance, nextSection[index]);
+      const c = pointAt(stations[stationIndex + 1].distance, nextSection[next]);
+      const d = pointAt(stations[stationIndex].distance, section[next]);
+      addTriangle(positions, a, b, c);
+      addTriangle(positions, a, c, d);
+    }
   }
+  const firstSection = sections[0];
+  const lastSection = sections[sections.length - 1];
   const triangles = THREE.ShapeUtils.triangulateShape(
-    section.map((point) => new THREE.Vector2(point.x, point.y)),
+    firstSection.map((point) => new THREE.Vector2(point.x, point.y)),
     [],
   );
   for (const [aIndex, bIndex, cIndex] of triangles) {
     addTriangle(
       positions,
-      pointAt(start, section[aIndex]),
-      pointAt(start, section[cIndex]),
-      pointAt(start, section[bIndex]),
+      pointAt(0, firstSection[aIndex]),
+      pointAt(0, firstSection[cIndex]),
+      pointAt(0, firstSection[bIndex]),
     );
     addTriangle(
       positions,
-      pointAt(end, section[aIndex]),
-      pointAt(end, section[bIndex]),
-      pointAt(end, section[cIndex]),
+      pointAt(length, lastSection[aIndex]),
+      pointAt(length, lastSection[bIndex]),
+      pointAt(length, lastSection[cIndex]),
     );
   }
   const geometry = new THREE.BufferGeometry();
@@ -598,47 +630,99 @@ function createPrismaticMember(
 }
 
 function memberThickness(params: ModelParams) {
-  return isAdvanced(params)
-    ? scaled(params, "advancedMemberThickness")
-    : scaled(params, "postMemberThickness");
+  return scaled(params, "apronThickness");
 }
 
-function memberDepth(params: ModelParams) {
-  return scaled(params, "memberDepth");
+function apronHeight(params: ModelParams) {
+  return scaled(params, "apronHeight");
+}
+
+function legWidthAtApron(params: ModelParams) {
+  return isAdvanced(params)
+    ? scaled(params, "advancedLegTopWidth")
+    : scaled(params, "postLegTopSize");
 }
 
 function longApronLength(params: ModelParams) {
-  const deduction = isAdvanced(params)
-    ? scaled(params, "advancedApronDeduction")
-    : scaled(params, "postApronDeduction");
-  return baseLength(params) - deduction;
+  return baseLength(params) - legWidthAtApron(params) * 2;
 }
 
 function sideApronLength(params: ModelParams) {
-  const deduction = isAdvanced(params)
-    ? scaled(params, "advancedApronDeduction")
-    : scaled(params, "postApronDeduction");
-  return baseWidth(params) - deduction;
+  return baseWidth(params) - legWidthAtApron(params) * 2;
 }
 
 function stretcherLength(params: ModelParams) {
-  const deduction = isAdvanced(params)
-    ? scaled(params, "advancedStretcherDeduction")
-    : scaled(params, "postStretcherDeduction");
-  return baseWidth(params) - deduction;
+  return baseWidth(params) - memberThickness(params) * 2;
 }
 
 type NamedGeometry = { geometry: THREE.BufferGeometry; name: string };
 
+function createMiteredDiagonalBrace(
+  params: ModelParams,
+  xSign: -1 | 1,
+  ySign: -1 | 1,
+  innerX: number,
+  innerY: number,
+  longReach: number,
+  sideReach: number,
+  thickness: number,
+  depth: number,
+) {
+  const corner = new THREE.Vector2(xSign * innerX, ySign * innerY);
+  const longContact = new THREE.Vector2(
+    corner.x - xSign * longReach,
+    corner.y,
+  );
+  const sideContact = new THREE.Vector2(
+    corner.x,
+    corner.y - ySign * sideReach,
+  );
+  const direction = sideContact.clone().sub(longContact);
+  const length = direction.length();
+  if (length <= EPSILON) {
+    throw new Error("Vinny diagonal block must have a calculated angle");
+  }
+  direction.normalize();
+  const normal = new THREE.Vector2(-direction.y, direction.x);
+  const intersectHorizontal = (offset: number) => {
+    const origin = longContact.clone().addScaledVector(normal, offset);
+    const distance = (corner.y - origin.y) / direction.y;
+    return origin.addScaledVector(direction, distance);
+  };
+  const intersectVertical = (offset: number) => {
+    const origin = sideContact.clone().addScaledVector(normal, offset);
+    const distance = (corner.x - origin.x) / direction.x;
+    return origin.addScaledVector(direction, distance);
+  };
+  const halfThickness = thickness / 2;
+  const plan = [
+    intersectHorizontal(-halfThickness),
+    intersectHorizontal(halfThickness),
+    intersectVertical(halfThickness),
+    intersectVertical(-halfThickness),
+  ].map((point) => ({ x: point.x, y: point.y }));
+  if (polygonArea(plan) < 0) plan.reverse();
+  const top = topBottom(params);
+  const bottom = top - depth;
+  return createLoftGeometry(
+    [
+      { z: bottom, points: plan },
+      { z: top, points: plan },
+    ],
+    new THREE.Vector3(direction.x, direction.y, 0),
+    textureSize(params),
+  );
+}
+
 function createFrameGeometries(params: ModelParams): NamedGeometry[] {
   const thickness = memberThickness(params);
-  const depth = memberDepth(params);
+  const depth = apronHeight(params);
   const z = topBottom(params) - depth / 2;
   const longY = baseWidth(params) / 2 - thickness / 2;
   const sideX = baseLength(params) / 2 - thickness / 2;
   const longLength = longApronLength(params);
   const sideLength = sideApronLength(params);
-  const apronRoundover = scaled(params, "apronBottomRoundoverRadius");
+  const apronRoundover = scaled(params, "apronOuterBottomRoundoverRadius");
   const geometries: NamedGeometry[] = [
     {
       name: "long-apron-front",
@@ -650,6 +734,7 @@ function createFrameGeometries(params: ModelParams): NamedGeometry[] {
         depth,
         z,
         apronRoundover,
+        -1,
       ),
     },
     {
@@ -662,6 +747,7 @@ function createFrameGeometries(params: ModelParams): NamedGeometry[] {
         depth,
         z,
         apronRoundover,
+        1,
       ),
     },
     {
@@ -674,6 +760,7 @@ function createFrameGeometries(params: ModelParams): NamedGeometry[] {
         depth,
         z,
         apronRoundover,
+        1,
       ),
     },
     {
@@ -686,6 +773,7 @@ function createFrameGeometries(params: ModelParams): NamedGeometry[] {
         depth,
         z,
         apronRoundover,
+        -1,
       ),
     },
   ];
@@ -711,28 +799,28 @@ function createFrameGeometries(params: ModelParams): NamedGeometry[] {
   if (diagonalBracesEnabled(params)) {
     const innerX = baseLength(params) / 2 - thickness;
     const innerY = baseWidth(params) / 2 - thickness;
-    const offset = Math.min(
-      scaled(params, "diagonalBraceOffset"),
+    const longReach = Math.min(
+      scaled(params, "diagonalBraceLongReach"),
       longLength / 3,
+    );
+    const sideReach = Math.min(
+      scaled(params, "diagonalBraceSideReach"),
       sideLength / 3,
     );
     for (const xSign of [-1, 1] as const) {
       for (const ySign of [-1, 1] as const) {
         geometries.push({
           name: `diagonal-brace-${xSign < 0 ? "left" : "right"}-${ySign < 0 ? "front" : "rear"}`,
-          geometry: createPrismaticMember(
+          geometry: createMiteredDiagonalBrace(
             params,
-            new THREE.Vector2(
-              xSign * (innerX - offset),
-              ySign * innerY,
-            ),
-            new THREE.Vector2(
-              xSign * innerX,
-              ySign * (innerY - offset),
-            ),
+            xSign,
+            ySign,
+            innerX,
+            innerY,
+            longReach,
+            sideReach,
             thickness,
             depth,
-            z,
           ),
         });
       }
@@ -880,20 +968,34 @@ export type VinnyCutPart = {
 
 export function getVinnyTableFabricationSpec(params: ModelParams) {
   const scale = getParam(params, "mockScale");
-  const diagonalOffset = Math.min(
-    scaled(params, "diagonalBraceOffset"),
+  const diagonalLongReach = Math.min(
+    scaled(params, "diagonalBraceLongReach"),
     longApronLength(params) / 3,
+  );
+  const diagonalSideReach = Math.min(
+    scaled(params, "diagonalBraceSideReach"),
     sideApronLength(params) / 3,
   );
+  const diagonalLongAngleDegrees =
+    THREE.MathUtils.radToDeg(
+      Math.atan2(diagonalSideReach, diagonalLongReach),
+    );
   const apronBottomHeight = apronBottom(params) * scale;
   return {
     apronBottomHeight,
     shoulderJoinHeight: apronBottomHeight,
+    apronHeight: getParam(params, "apronHeight"),
+    apronThickness: getParam(params, "apronThickness"),
+    longApronLength: longApronLength(params) * scale,
+    sideApronLength: sideApronLength(params) * scale,
     support: supportModeUsesChannels(params) ? "c-channels" : "stretchers",
     crossSupportCount: 3,
     crossSupportLength: stretcherLength(params) * scale,
     diagonalBraceCount: diagonalBracesEnabled(params) ? 4 : 0,
-    diagonalBraceLength: diagonalOffset * Math.SQRT2 * scale,
+    diagonalBraceLength:
+      Math.hypot(diagonalLongReach, diagonalSideReach) * scale,
+    diagonalLongAngleDegrees,
+    diagonalSideAngleDegrees: 90 - diagonalLongAngleDegrees,
   } as const;
 }
 
@@ -916,7 +1018,7 @@ export function getVinnyTableCutList(params: ModelParams): VinnyCutPart[] {
         length: legBlankLength,
         width: getParam(params, "advancedLegTopWidth"),
         thickness: getParam(params, "advancedLegThickness"),
-        notes: `Mirror the circular shoulder profile so it meets the live apron bottom, miter matching halves at 45° into four L-shaped corner legs, round the outside corner, and bevel the remaining exposed vertical edges.${levelingFeetEnabled(params) ? " Length is shortened by the installed foot extension to preserve overall height." : ""}`,
+        notes: `Mirror the circular shoulder profile so it meets the live apron bottom, miter matching halves at 45° into four L-shaped corner legs, round the outside corner independently, and round the other four exposed vertical edges to their shared radius.${levelingFeetEnabled(params) ? " Length is shortened by the installed foot extension to preserve overall height." : ""}`,
       }
     : {
         id: "A1",
@@ -928,7 +1030,7 @@ export function getVinnyTableCutList(params: ModelParams): VinnyCutPart[] {
         thickness: getParam(params, "postLegTopSize"),
         notes: `${isIntermediate(params)
           ? "Leave the top 3 in square and taper both inside faces to the specified foot."
-          : "Keep the four post blanks square and straight."} Round the outside corner and bevel the other exposed vertical edges.${levelingFeetEnabled(params) ? " Length is shortened by the installed foot extension to preserve overall height." : ""}`,
+          : "Keep the four post blanks square and straight."} Round the outside corner independently and round the other exposed vertical edges to their shared radius.${levelingFeetEnabled(params) ? " Length is shortened by the installed foot extension to preserve overall height." : ""}`,
       };
   const scale = getParam(params, "mockScale");
   const support: VinnyCutPart = supportModeUsesChannels(params)
@@ -948,27 +1050,27 @@ export function getVinnyTableCutList(params: ModelParams): VinnyCutPart[] {
         name: "Cross stretchers",
         quantity: 3,
         length: stretcherLength(params) * scale,
-        width: getParam(params, "memberDepth"),
+        width: getParam(params, "apronHeight"),
         thickness: memberThickness(params) * scale,
-        notes: "One centered; outer two use the editable on-center spacing.",
+        notes: "One centered; outer two use the editable on-center spacing. Length is derived from the live inside faces of the two long aprons.",
       };
   const fabrication = getVinnyTableFabricationSpec(params);
   return [
     { id: "T1", material: "Oak", name: "Tabletop panel", quantity: 1, length: topLength, width: topWidth, thickness: topThickness, notes: `${isOverhang(params) ? "Centered over the smaller base." : "Flush to the base with the modeled perimeter shadow groove."} Shape the plan corners and top edge to the listed radii.` },
     legs,
-    { id: "B1", material: "Oak", name: "Long aprons", quantity: 2, length: longApronLength(params) * scale, width: getParam(params, "memberDepth"), thickness: memberThickness(params) * scale, notes: "Length changes with the table length; round the two lower longitudinal edges to the listed radius." },
-    { id: "B2", material: "Oak", name: "Short aprons", quantity: 2, length: sideApronLength(params) * scale, width: getParam(params, "memberDepth"), thickness: memberThickness(params) * scale, notes: "Width changes with the table width; round the two lower longitudinal edges to the listed radius." },
+    { id: "B1", material: "Oak", name: "Long aprons", quantity: 2, length: longApronLength(params) * scale, width: getParam(params, "apronHeight"), thickness: getParam(params, "apronThickness"), notes: "Length is derived from the table and leg widths. Round only the outer lower longitudinal edge; leave the inner edge and both end lands square for flush joinery." },
+    { id: "B2", material: "Oak", name: "Short aprons", quantity: 2, length: sideApronLength(params) * scale, width: getParam(params, "apronHeight"), thickness: getParam(params, "apronThickness"), notes: "Length is derived from the table and leg widths. Round only the outer lower longitudinal edge; leave the inner edge and both end lands square for flush joinery." },
     support,
     ...(diagonalBracesEnabled(params)
       ? [{
           id: "B4",
           material: "Oak" as const,
-          name: "Diagonal apron braces",
+          name: "Diagonal apron blocks",
           quantity: 4,
           length: fabrication.diagonalBraceLength,
-          width: getParam(params, "memberDepth"),
+          width: getParam(params, "apronHeight"),
           thickness: memberThickness(params) * scale,
-          notes: "Fit one brace across each inside corner between the long and short aprons; confirm the end angles against the assembled frame.",
+          notes: `Miter to the calculated ${fabrication.diagonalLongAngleDegrees.toFixed(1)}° long-apron and ${fabrication.diagonalSideAngleDegrees.toFixed(1)}° side-apron contact angles; both end faces and the block top/bottom finish flush with the square apron inside faces.`,
         }]
       : []),
   ];
@@ -1026,7 +1128,7 @@ function evaluateStructure(params: ModelParams) {
   const topThickness = getParam(params, "topThickness");
   const longSpan = longApronLength(params) * getParam(params, "mockScale");
   const sideSpan = sideApronLength(params) * getParam(params, "mockScale");
-  const depth = getParam(params, "memberDepth");
+  const depth = getParam(params, "apronHeight");
   const thickness = memberThickness(params) * getParam(params, "mockScale");
   const legWidth = isAdvanced(params)
     ? getParam(params, "advancedLegTopWidth")
@@ -1039,7 +1141,13 @@ function evaluateStructure(params: ModelParams) {
   const braced = diagonalBracesEnabled(params);
   const channels = supportModeUsesChannels(params);
   const braceFactor = braced
-    ? Math.min(1, getParam(params, "diagonalBraceOffset") / (8 * INCH))
+    ? Math.min(
+        1,
+        Math.sqrt(
+          (getParam(params, "diagonalBraceLongReach") / (8 * INCH)) *
+            (getParam(params, "diagonalBraceSideReach") / (8 * INCH)),
+        ),
+      )
     : 0;
   const channelFactor = channels
     ? Math.min(
@@ -1090,17 +1198,17 @@ function evaluateStructure(params: ModelParams) {
     4 * channelFactor;
   const commonInputs = [
     { key: "overallHeight", label: "Overall height", value: height, format: "length" as const },
-    { key: "memberDepth", label: "Frame member depth", value: depth, format: "length" as const },
-    { key: "memberThickness", label: "Frame member thickness", value: thickness, format: "length" as const },
+    { key: "apronHeight", label: "Apron height", value: depth, format: "length" as const },
+    { key: "apronThickness", label: "Apron thickness", value: thickness, format: "length" as const },
     { key: "legTopWidth", label: "Leg width at frame", value: legWidth, format: "length" as const },
     { key: "legFootWidth", label: "Leg contact width", value: legFoot, format: "length" as const },
-    { key: "diagonalBracesEnabled", label: "Diagonal braces enabled", value: braced ? 1 : 0, format: "number" as const, precision: 0 },
+    { key: "diagonalBracesEnabled", label: "Diagonal corner blocks enabled", value: braced ? 1 : 0, format: "number" as const, precision: 0 },
     { key: "supportMode", label: "C-channel support mode", value: channels ? 1 : 0, format: "number" as const, precision: 0 },
   ];
   const metrics = [
-    metric("longitudinal-racking", "Long-apron racking", longRacking, `${formatLength(depth, "in")} frame depth · ${formatLength(longSpan, "in")} span${braced ? " · four corner diagonals" : ""}`, `The two continuous long aprons and four corner legs form the modeled lengthwise load path.${braced ? " The four modeled diagonal members receive triangulation credit." : ""} Joint rotation is not credited.`, commonInputs),
-    metric("end-box-racking", "End-frame racking", sideRacking, `${formatLength(depth, "in")} frame depth · ${formatLength(sideSpan, "in")} span${braced ? " · four corner diagonals" : ""}`, `The two short aprons close the end frames.${braced ? " The four modeled diagonal members receive triangulation credit." : ""} Domino, dowel, pocket-hole, or brace-joint capacity must be established physically.`, commonInputs),
-    metric("torsion", "Frame-and-support torsion", torsion, `closed perimeter frame · ${channels ? "three C-channels" : "three oak stretchers"}${braced ? " · four corner diagonals" : ""}`, `The closed apron loop and ${channels ? "three modeled C-channels receive limited tabletop-plane credit; they are not credited as apron-leg braces" : "three cross stretchers receive frame-topology credit"}.${braced ? " Four diagonal members receive corner-triangulation credit." : ""} Fastener slip and joint stiffness remain unmodeled.`, commonInputs),
+    metric("longitudinal-racking", "Long-apron racking", longRacking, `${formatLength(depth, "in")} frame depth · ${formatLength(longSpan, "in")} span${braced ? " · four corner blocks" : ""}`, `The two continuous long aprons and four corner legs form the modeled lengthwise load path.${braced ? " The four modeled diagonal blocks receive triangulation credit." : ""} Joint rotation is not credited.`, commonInputs),
+    metric("end-box-racking", "End-frame racking", sideRacking, `${formatLength(depth, "in")} frame depth · ${formatLength(sideSpan, "in")} span${braced ? " · four corner blocks" : ""}`, `The two short aprons close the end frames.${braced ? " The four modeled diagonal blocks receive triangulation credit." : ""} Domino, dowel, pocket-hole, or block-joint capacity must be established physically.`, commonInputs),
+    metric("torsion", "Frame-and-support torsion", torsion, `closed perimeter frame · ${channels ? "three C-channels" : "three oak stretchers"}${braced ? " · four corner blocks" : ""}`, `The closed apron loop and ${channels ? "three modeled C-channels receive limited tabletop-plane credit; they are not credited as apron-leg braces" : "three cross stretchers receive frame-topology credit"}.${braced ? " Four diagonal blocks receive corner-triangulation credit." : ""} Fastener slip and joint stiffness remain unmodeled.`, commonInputs),
     metric("tipping", "Tipping margin", tipping, `controlling half-footprint / height ${tippingRatio.toFixed(2)}`, "The support polygon is derived from the base envelope. This is not a safe-load prediction for sitting or climbing.", commonInputs),
     metric("floor-rocking", "Floor rocking tolerance", floorRocking, levelingFeetEnabled(params) ? "four independent adjusters" : "four fixed wood contacts", "Independent adjusters can bring all four contacts onto one plane; insert capacity and floor bearing still require physical checks.", commonInputs),
     metric("member-stiffness", "Member stiffness", stiffness, `leg ${legSlenderness.toFixed(1)}:1 · long apron ${longSlenderness.toFixed(1)}:1`, "This relative slenderness screen does not calculate allowable stress, deflection, buckling, or connection capacity.", commonInputs),
@@ -1110,7 +1218,7 @@ function evaluateStructure(params: ModelParams) {
     overallScore,
     overallGrade: grade(overallScore),
     overallCalculation: {
-      rationale: `The Vinny composite emphasizes the orthogonal apron frame, ${braced ? "four diagonal corner braces" : "unbraced corners"}, and the selected ${channels ? "C-channel tabletop support" : "oak stretcher frame path"} while keeping floor contact, tipping, and slenderness visible.`,
+      rationale: `The Vinny composite emphasizes the orthogonal apron frame, ${braced ? "four diagonal corner blocks" : "unbraced corners"}, and the selected ${channels ? "C-channel tabletop support" : "oak stretcher frame path"} while keeping floor contact, tipping, and slenderness visible.`,
       formula: metrics.map((entry) => `${(entry.calculation.weight * 100).toFixed(0)}% × ${entry.label}`).join(" + "),
       scoringNote: "Geometry-only comparison, not a load, joint, or durability certification.",
     },
@@ -1182,23 +1290,23 @@ export function getVinnyTableParameterLimits(
       limits.max,
       getParam(params, "advancedLegTopWidth") -
         getParam(params, "advancedLegFootWidth"),
-      height - topThickness - getParam(params, "memberDepth"),
+      height - topThickness - getParam(params, "apronHeight"),
     );
   } else if (key === "legOuterCornerRadius") {
     const legWidth = isAdvanced(params)
       ? getParam(params, "advancedLegTopWidth")
       : getParam(params, "postLegTopSize");
     limits.max = Math.min(limits.max, legWidth / 2);
-  } else if (key === "legEdgeBevel") {
+  } else if (key === "legEdgeRadius") {
     const legWidth = isAdvanced(params)
       ? getParam(params, "advancedLegThickness")
       : getParam(params, "postLegTopSize");
     limits.max = Math.min(limits.max, legWidth / 4);
-  } else if (key === "apronBottomRoundoverRadius") {
+  } else if (key === "apronOuterBottomRoundoverRadius") {
     limits.max = Math.min(
       limits.max,
       memberThickness(params) * getParam(params, "mockScale") / 2,
-      getParam(params, "memberDepth"),
+      getParam(params, "apronHeight"),
     );
   } else if (key === "cChannelWallThickness") {
     limits.max = Math.min(
@@ -1206,10 +1314,14 @@ export function getVinnyTableParameterLimits(
       getParam(params, "cChannelWidth") / 2 - limits.step,
       getParam(params, "cChannelDepth") - limits.step,
     );
-  } else if (key === "diagonalBraceOffset") {
+  } else if (key === "diagonalBraceLongReach") {
     limits.max = Math.min(
       limits.max,
       longApronLength(params) * getParam(params, "mockScale") / 3,
+    );
+  } else if (key === "diagonalBraceSideReach") {
+    limits.max = Math.min(
+      limits.max,
       sideApronLength(params) * getParam(params, "mockScale") / 3,
     );
   } else if (key === "flushGrooveDepth") {
@@ -1238,11 +1350,11 @@ export function getVinnyTableAuditValue(
     case "tabletopProfile":
       return auditItem(check.label, `${formatLength(getParam(params, "topThickness"), unit)} top · ${formatLength(getParam(params, "tabletopCornerRadius"), unit)} corners · ${formatLength(getParam(params, "tabletopRoundoverRadius"), unit)} top roundover · ${isOverhang(params) ? `${formatLength(getParam(params, "topOverhang"), unit)} overhang` : `${formatLength(getParam(params, "flushGrooveWidth"), unit)} × ${formatLength(getParam(params, "flushGrooveDepth"), unit)} flush shadow groove`}`);
     case "legGeometry":
-      return auditItem(check.label, `4 ${style} legs · ${formatLength(getParam(params, isAdvanced(params) ? "advancedLegTopWidth" : "postLegTopSize"), unit)} top width · ${formatLength(getParam(params, "legOuterCornerRadius"), unit)} outside radius · ${formatLength(getParam(params, "legEdgeBevel"), unit)} other-edge bevel${isAdvanced(params) ? " · shoulder tangent at apron bottom" : ""}`);
+      return auditItem(check.label, `4 ${style} legs · ${formatLength(getParam(params, isAdvanced(params) ? "advancedLegTopWidth" : "postLegTopSize"), unit)} top width · ${formatLength(getParam(params, "legOuterCornerRadius"), unit)} outside radius · ${formatLength(getParam(params, "legEdgeRadius"), unit)} shared radius on the other exposed vertical edges${isAdvanced(params) ? " · shoulder tangent at apron bottom" : ""}`);
     case "legEndRoundovers":
       return auditItem(check.label, levelingFeetEnabled(params) ? `4 independent ${formatLength(getParam(params, "levelingFootPadDiameter"), unit)} pads` : "4 fixed wood contacts");
     case "cornerPlates":
-      return auditItem(check.label, `2 × ${formatLength(longApronLength(params) * scale, unit)} long · 2 × ${formatLength(sideApronLength(params) * scale, unit)} short aprons · ${formatLength(getParam(params, "apronBottomRoundoverRadius"), unit)} bottom roundover · ${diagonalBracesEnabled(params) ? "4 diagonal braces" : "no diagonal braces"}`);
+      return auditItem(check.label, `2 × ${formatLength(longApronLength(params) * scale, unit)} long · 2 × ${formatLength(sideApronLength(params) * scale, unit)} short aprons · ${formatLength(getParam(params, "apronHeight"), unit)} high × ${formatLength(getParam(params, "apronThickness"), unit)} thick · ${formatLength(getParam(params, "apronOuterBottomRoundoverRadius"), unit)} outer-only bottom roundover · ${diagonalBracesEnabled(params) ? `4 calculated-angle diagonal blocks (${getVinnyTableFabricationSpec(params).diagonalLongAngleDegrees.toFixed(1)}° / ${getVinnyTableFabricationSpec(params).diagonalSideAngleDegrees.toFixed(1)}°)` : "no diagonal blocks"}`);
     case "channelLayout":
       return auditItem(check.label, `3 × ${formatLength(stretcherLength(params) * scale, unit)} ${supportModeUsesChannels(params) ? `steel C-channels (${formatLength(getParam(params, "cChannelWidth"), unit)} × ${formatLength(getParam(params, "cChannelDepth"), unit)})` : "oak cross stretchers"} · ${formatLength(getParam(params, "stretcherSpacing"), unit)} outer spacing`);
     case "printEnvelope": {
@@ -1254,8 +1366,8 @@ export function getVinnyTableAuditValue(
     case "minimumMockFeature": {
       const candidates = [
         getParam(params, "flushGrooveDepth"),
-        getParam(params, "legEdgeBevel"),
-        getParam(params, "apronBottomRoundoverRadius"),
+        getParam(params, "legEdgeRadius"),
+        getParam(params, "apronOuterBottomRoundoverRadius"),
         memberThickness(params) * scale,
         getParam(params, "levelingFootRodDiameter"),
         ...(supportModeUsesChannels(params)

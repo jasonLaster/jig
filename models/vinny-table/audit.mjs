@@ -31,41 +31,42 @@ close(params.advancedLegFootWidth, 2 * inch, "advanced leg foot width");
 close(params.advancedLegThickness, 1.5 * inch, "advanced leg-half thickness");
 close(params.advancedShoulderRadius, 1.5 * inch, "advanced shoulder radius");
 close(params.legOuterCornerRadius, 0.75 * inch, "leg outside-corner radius");
-close(params.legEdgeBevel, 0.125 * inch, "other leg-edge bevel");
-close(params.memberDepth, 2.5 * inch, "member depth");
-close(params.apronBottomRoundoverRadius, 0.75 * inch, "apron bottom roundover");
-close(params.advancedMemberThickness, 1.5 * inch, "advanced member thickness");
-close(params.postMemberThickness, 1.25 * inch, "post member thickness");
-close(params.advancedApronDeduction, 12 * inch, "advanced apron deduction");
-close(params.postApronDeduction, 5 * inch, "post apron deduction");
-close(params.advancedStretcherDeduction, 3 * inch, "advanced stretcher deduction");
-close(params.postStretcherDeduction, 2.5 * inch, "post stretcher deduction");
+close(params.legEdgeRadius, 0.125 * inch, "other leg-edge radius");
+close(params.apronHeight, 2.5 * inch, "apron height / board width");
+close(params.apronThickness, 1.5 * inch, "apron thickness");
+close(params.apronOuterBottomRoundoverRadius, 0.75 * inch, "apron outer-bottom roundover");
 close(params.stretcherSpacing, 22 * inch, "stretcher spacing");
 assert.equal(params.supportMode, 0);
 close(params.cChannelWidth, 2 * inch, "C-channel width");
 close(params.cChannelDepth, 0.5 * inch, "C-channel depth");
 close(params.cChannelWallThickness, 0.125 * inch, "C-channel wall");
 assert.equal(params.diagonalBracesEnabled, 1);
-close(params.diagonalBraceOffset, 8 * inch, "diagonal brace reach");
+close(params.diagonalBraceLongReach, 8 * inch, "diagonal long-apron reach");
+close(params.diagonalBraceSideReach, 8 * inch, "diagonal side-apron reach");
 assert.equal(params.levelingFeetEnabled, 1);
 close(params.levelingFootPadDiameter, 1.25 * inch, "leveling pad diameter");
 close(params.levelingFootRodDiameter, 0.375 * inch, "leveling rod diameter");
 
-const longApron = params.tableLength - params.advancedApronDeduction;
-const shortApron = params.tableWidth - params.advancedApronDeduction;
-const stretcher = params.tableWidth - params.advancedStretcherDeduction;
+const longApron = params.tableLength - 2 * params.advancedLegTopWidth;
+const shortApron = params.tableWidth - 2 * params.advancedLegTopWidth;
+const stretcher = params.tableWidth - 2 * params.apronThickness;
 close(longApron, 84 * inch, "derived long apron");
 close(shortApron, 28 * inch, "derived short apron");
 close(stretcher, 37 * inch, "derived stretcher");
 assert.ok(params.advancedLegFootWidth > params.advancedLegThickness);
 assert.ok(params.advancedShoulderRadius <= params.advancedLegTopWidth - params.advancedLegFootWidth);
-assert.equal(params.memberDepth, 2.5 * inch, "apron depth owns the shoulder join elevation");
+assert.equal(params.apronHeight, 2.5 * inch, "apron height owns the shoulder join elevation");
 assert.ok(params.tabletopRoundoverRadius <= params.tabletopCornerRadius);
-assert.ok(params.apronBottomRoundoverRadius <= params.advancedMemberThickness / 2);
+assert.ok(params.apronOuterBottomRoundoverRadius <= params.apronThickness / 2);
 assert.ok(params.cChannelWallThickness < Math.min(params.cChannelWidth / 2, params.cChannelDepth));
 assert.ok(params.flushGrooveDepth < params.topThickness);
 assert.ok(params.levelingFootPadThickness <= params.levelingFootExtension);
 assert.ok(params.levelingFootExtension < params.levelingFootRodLength);
+assert.ok(model.parameters.every((parameter) => parameter.group), "every Vinny parameter must belong to a UI group");
+assert.ok(
+  model.parameters.every((parameter) => !/Deduction$/.test(parameter.key)),
+  "Vinny lengths must be derived without deduction parameters",
+);
 
 const mockEnvelope = [params.tableLength, params.tableWidth, params.overallHeight].map((value) => value / params.mockScale);
 assert.ok(mockEnvelope[0] <= 256, "default mock length must fit a 256 mm bed");
@@ -80,6 +81,7 @@ for (const required of [
   "createVinnyTopGeometry",
   "createFrameGeometries",
   "createPrismaticMember",
+  "createMiteredDiagonalBrace",
   "createCChannelGeometry",
   "createVinnyTableHardwareGeometries",
   "getVinnyTableCutList",
@@ -104,7 +106,10 @@ for (const required of [
   "always meets - the live apron bottom",
   "Tabletop corner radius and top-edge roundover are separate controls",
   "C-channel mode removes those stretchers",
-  "Four optional diagonal oak braces",
+  "Four optional diagonal oak blocks",
+  "outer lower edge",
+  "calculated contact angles",
+  "deduction controls",
   "physical result overrides this screen",
 ]) {
   assert.ok(spec.includes(required), `structural spec is missing ${required}`);
