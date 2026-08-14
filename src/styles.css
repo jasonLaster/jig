@@ -1446,20 +1446,24 @@ html.dark .viewer-status span {
 }
 
 [data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(1) {
-  width: 27%;
+  width: 22%;
 }
 
 [data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(2) {
+  width: 8%;
+}
+
+[data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(3) {
   width: 6%;
 }
 
-[data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(3),
 [data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(4),
-[data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(5) {
-  width: 10%;
+[data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(5),
+[data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(6) {
+  width: 9%;
 }
 
-[data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(6) {
+[data-testid="vinny-cut-list"] .hover-cut-table th:nth-child(7) {
   width: 37%;
 }
 
@@ -2332,6 +2336,21 @@ html.dark .panel-section:nth-child(even) {
 
 .vinny-style-controls [data-slot="select-trigger"] {
   width: 100%;
+}
+
+.vinny-style-controls .vinny-brace-toggle {
+  display: grid;
+  gap: 6px;
+}
+
+.vinny-style-controls .toggle-control {
+  display: flex;
+}
+
+.vinny-style-controls .vinny-brace-toggle small {
+  color: var(--muted-strong);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .hover-brochure-panel {

@@ -30,7 +30,7 @@ export function VinnyTableCutList({
             <h2>Vinny Table cut list</h2>
           </div>
           <p>
-            {pieceCount} wood pieces · full size · verify every part against the
+            {pieceCount} fabrication pieces · full size · verify every part against the
             physical build before cutting
           </p>
         </header>
@@ -40,6 +40,7 @@ export function VinnyTableCutList({
             <thead>
               <tr>
                 <th>Part</th>
+                <th>Material</th>
                 <th>Qty</th>
                 <th>Length</th>
                 <th>Width</th>
@@ -54,6 +55,7 @@ export function VinnyTableCutList({
                     <span className="hover-cut-part-id">{part.id}</span>{" "}
                     {part.name}
                   </th>
+                  <td>{part.material}</td>
                   <td>{part.quantity}</td>
                   <td>{formatLength(part.length, unit)}</td>
                   <td>{formatLength(part.width, unit)}</td>
@@ -68,9 +70,9 @@ export function VinnyTableCutList({
         <footer className="hover-cut-sheet-footer">
           <p>
             The advanced A1 quantity is eight profiled halves: pair and miter
-            them into four continuous corner legs. Joinery locations are
-            intentionally not inferred where the supplemental drawing leaves
-            them to the course and the builder.
+            them into four continuous corner legs. C-channel stock and all
+            joinery locations must be verified against the physical hardware,
+            assembled frame, course, and builder-selected attachment method.
           </p>
         </footer>
       </div>

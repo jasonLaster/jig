@@ -417,6 +417,8 @@ const SCALAR_PARAM_KEYS = new Set([
   "matchLengthwiseRailRoundover",
   "legStyle",
   "topStyle",
+  "supportMode",
+  "diagonalBracesEnabled",
 ]);
 const CURVE_PARAM_KEYS = new Set([
   "topEdgeTension",
@@ -434,6 +436,8 @@ const OPTION_PARAM_KEYS = new Set([
   "matchLengthwiseRailRoundover",
   "legStyle",
   "topStyle",
+  "supportMode",
+  "diagonalBracesEnabled",
 ]);
 const LEG_GROOVE_PARAM_KEYS = new Set([
   "legGrooveHeight",
@@ -3555,6 +3559,34 @@ function VinnyStyleControls({
           </SelectContent>
         </Select>
       </label>
+      <label>
+        <span>Cross-support system</span>
+        <Select
+          onValueChange={(value) => onChange("supportMode", Number(value))}
+          value={String(Math.round(getParam(params, "supportMode")))}
+        >
+          <SelectTrigger aria-label="Vinny cross-support system">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="0">Oak stretchers</SelectItem>
+            <SelectItem value="1">Steel C-channels</SelectItem>
+          </SelectContent>
+        </Select>
+      </label>
+      <div className="vinny-brace-toggle">
+        <OriginalOverlayToggle
+          checked={getParam(params, "diagonalBracesEnabled") >= 0.5}
+          label="Diagonal apron braces"
+          onChange={(checked) =>
+            onChange("diagonalBracesEnabled", checked ? 1 : 0)
+          }
+        />
+        <small>
+          Four braces triangulate the inside corners between the long and short
+          aprons.
+        </small>
+      </div>
     </div>
   );
 }
@@ -6383,6 +6415,9 @@ export default function App({
                         const intermediate =
                           getParam(params, "legStyle") >= 0.5 && !advanced;
                         const overhang = getParam(params, "topStyle") >= 0.5;
+                        const channels = getParam(params, "supportMode") >= 0.5;
+                        const diagonalBraces =
+                          getParam(params, "diagonalBracesEnabled") >= 0.5;
                         if (
                           (!overhang && parameter.key === "topOverhang") ||
                           (overhang &&
@@ -6401,7 +6436,10 @@ export default function App({
                               parameter.key === "advancedApronDeduction" ||
                               parameter.key === "advancedStretcherDeduction")) ||
                           (!intermediate &&
-                            parameter.key === "postLegFootSize")
+                            parameter.key === "postLegFootSize") ||
+                          (!channels && parameter.key.startsWith("cChannel")) ||
+                          (!diagonalBraces &&
+                            parameter.key === "diagonalBraceOffset")
                         ) {
                           return false;
                         }

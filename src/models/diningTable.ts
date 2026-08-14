@@ -573,10 +573,11 @@ export function createDiningTableHardwareGeometries(
   params: ModelParams,
 ) {
   if (isVinnyParams(params)) {
+    const hardware = createVinnyTableHardwareGeometries(params);
     return {
       plates: [],
-      channels: [],
-      feet: createVinnyTableHardwareGeometries(params).feet,
+      channels: hardware.channels,
+      feet: hardware.feet,
     };
   }
   if (isWhispererParams(params)) {

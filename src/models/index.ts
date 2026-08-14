@@ -91,6 +91,7 @@ export {
   createVinnyTableHardwareGeometries,
   createVinnyTableWoodGeometry,
   getVinnyTableCutList,
+  getVinnyTableFabricationSpec,
   getVinnyTableStructuralAssessment,
 } from "./vinnyTable";
 export type { VinnyCutPart } from "./vinnyTable";
