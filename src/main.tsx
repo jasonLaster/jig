@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import {
   ConvexProvider,
   ConvexReactClient,
+  useConvex,
   useMutation,
   useQuery,
 } from "convex/react";
@@ -16,11 +17,29 @@ import App, {
   type BrochurePersistence,
   type SavedBrochure,
 } from "./App";
+import { subscribeToOptionalQuery } from "./optionalQuery";
 import "./styles.css";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
 const convexEnabled =
   Boolean(convexUrl) && import.meta.env.VITE_DISABLE_CONVEX !== "true";
+
+function useBrochureJobs(clientId: string) {
+  const client = useConvex();
+  const [jobs, setJobs] = React.useState<BrochureJob[] | undefined>();
+
+  React.useEffect(() => {
+    const watch = client.watchQuery(api.brochures.listStatusesByClient, {
+      clientId,
+    });
+    return subscribeToOptionalQuery(watch, (value) => {
+      setJobs(value as BrochureJob[] | undefined);
+    });
+  }, [client, clientId]);
+
+  return jobs;
+}
+
 function ConnectedApp() {
   const [clientId] = React.useState(getBrochureClientId);
   const createBrochure = useMutation(api.brochures.create);
@@ -28,9 +47,7 @@ function ConnectedApp() {
   const failBrochure = useMutation(api.brochures.fail);
   const generateUploadUrl = useMutation(api.brochures.generateUploadUrl);
   const listedBrochures = useQuery(api.brochures.listByClient, { clientId });
-  const listedBrochureJobs = useQuery(api.brochures.listStatusesByClient, {
-    clientId,
-  });
+  const listedBrochureJobs = useBrochureJobs(clientId);
   const requestedGenerationId = new URLSearchParams(window.location.search).get(
     "brochure",
   );
@@ -110,7 +127,7 @@ function ConnectedApp() {
   return (
     <App
       brochureClientId={clientId}
-      brochureJobs={listedBrochureJobs as BrochureJob[] | undefined}
+      brochureJobs={listedBrochureJobs}
       brochurePersistence={persistence}
       convexEnabled
       savedBrochures={brochures}

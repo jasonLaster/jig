@@ -207,6 +207,28 @@ test("renders the Plate Table and exports the registered two-color 1:10 mock", a
   expect(pageErrors).toEqual([]);
 });
 
+test("renders the reported Plate Table shared URL without crashing", async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") pageErrors.push(message.text());
+  });
+
+  await page.goto(
+    "/?model=dining-table&unit=in&quality=high&mockScale=10&tableLength=76&tableWidth=38&overallHeight=30&topThickness=1.5&tabletopCornerRadius=1&topRoundoverRadius=0.5&bottomRoundoverRadius=0.5&legSize=4&legCornerRadius=1&legOuterCornerRadius=1&legEdgeInset=0&legGrooveEnabled=1&legGrooveHeight=0.25&legGrooveDepth=0.125&legTopRoundoverRadius=0.25&legBottomRoundoverRadius=0.25&levelingFeetEnabled=1&levelingFootPadDiameter=1.5&levelingFootPadThickness=0.25&levelingFootRodDiameter=0.375&levelingFootRodLength=3&levelingFootExtensionLeftFront=0.75&levelingFootExtensionLeftRear=0.75&levelingFootExtensionRightFront=0.75&levelingFootExtensionRightRear=0.75&plateSize=6&plateThickness=0.25&plateEdgeInset=0.5&channelPosition1=16&channelPosition2=38&channelPosition3=60&channelLength=32&channelWidth=2&channelDepth=0.5",
+  );
+
+  await expect(page.getByRole("heading", { name: "Plate Table" })).toBeVisible();
+  await expect(page.getByLabel("Plate Table model viewer")).toBeVisible();
+  await expect(page.locator(".scene-panel canvas")).toBeVisible();
+  await expect(page.getByLabel("Table length in inches")).toHaveValue("76");
+  await expect(page.getByLabel("Left-front installed extension in inches")).toHaveValue("3/4");
+  await expect(page.getByText("16 in · 38 in · 60 in")).toBeVisible();
+  expect(pageErrors).toEqual([]);
+});
+
 test("screens Plate Table structure and responds monotonically to key geometry", () => {
   const baseline = getDiningTableStructuralAssessment(defaultParams);
   expect(baseline.metrics).toHaveLength(6);
