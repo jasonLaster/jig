@@ -126,6 +126,7 @@ import {
 import { recordFlyover } from "./recordFlyover";
 import { getVinnyFinishes } from "./models/vinnyFinishes";
 import { WOOD_FINISHES, createWoodTexture, getWoodSpeciesForModel } from "./woodTexture";
+import { disposeWoodMaterial, loadWalnutMaterial } from "./walnutPbr";
 import {
   loadOakRenderingAssets,
   type OakRenderingAssets,
@@ -2315,19 +2316,34 @@ const HolderViewer = forwardRef<
             metalness: isWoodFurniture ? 0 : 0.08,
             side: THREE.DoubleSide,
           });
-        mainMaterialRef.current = mainMaterial;
         if (model.id === "vinny-table") {
-          vinnyMaterialsRef.current = new Map(WOOD_FINISHES.map(({ species }) => [
-            species,
-            species === "oak" ? mainMaterial : new THREE.MeshStandardMaterial({
+          const materials = await Promise.all(WOOD_FINISHES.map(async ({ species }) => {
+            if (species === "oak") return [species, mainMaterial] as const;
+            try {
+              const material = await loadWalnutMaterial(renderer, species);
+              if (material) return [species, material] as const;
+            } catch (error) {
+              console.warn("Unable to load walnut rendering assets", error);
+            }
+            return [species, new THREE.MeshStandardMaterial({
               color: "#ffffff",
               map: createWoodTexture(renderer, species),
               roughness: 0.72,
               metalness: 0,
               side: THREE.DoubleSide,
-            }),
-          ]));
+            })] as const;
+          }));
+          if (disposed) {
+            for (const [, material] of materials) {
+              if (material !== oakAssets?.material) disposeWoodMaterial(material);
+            }
+            mainGeometry.dispose();
+            normalizedMain.geometry.dispose();
+            return;
+          }
+          vinnyMaterialsRef.current = new Map(materials);
         }
+        mainMaterialRef.current = mainMaterial;
         const domeMaterial = new THREE.MeshStandardMaterial({
           color: "#111318",
           roughness: 0.72,
@@ -2582,8 +2598,7 @@ const HolderViewer = forwardRef<
         }
       });
       for (const material of vinnyMaterialsRef.current.values()) {
-        if (material !== oakAssets?.material) material.map?.dispose();
-        material.dispose();
+        if (material !== oakAssets?.material) disposeWoodMaterial(material);
       }
       vinnyMaterialsRef.current.clear();
       oakAssets?.dispose();

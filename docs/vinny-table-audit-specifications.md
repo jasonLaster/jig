@@ -65,10 +65,23 @@ This is a geometry-only screen, not engineering certification. Before build appr
 ## Wood finishes
 
 Table wood and groove wood are saved model parameters. Oak, walnut, maple, ash,
-and cherry are available; the groove defaults to Same as table. The separate
+cherry, smoked walnut, and natural walnut are available; the groove defaults to
+Same as table. The separate
 finish covers the existing recessed wall and underside shoulder of the flush
 shadow groove. Overhang tops hide this control and have no groove material faces.
 Species changes preserve all positions, normals, grain coordinates, dimensions,
 structural scores, and STL geometry. The cut sheet names the chosen table wood
 and records the groove finish on the tabletop row. These are appearance choices;
 they do not specify an inlay construction or separate inlay cutting dimensions.
+
+The two additional walnut finishes use Jenelle van Heerden's Poly Haven CC0
+material sets: [Smoked Walnut Veneer](https://polyhaven.com/a/smoked_walnut_veneer)
+and [Natural Walnut Veneer](https://polyhaven.com/a/natural_walnut_veneer).
+Matching 2K base-color, OpenGL normal, and roughness maps are stored locally as
+WebP; their source names are retained rather than claiming Bastogne or Claro.
+A satin-oil appearance tint is applied in the material; it is not a calibrated
+prediction of a physical finish. Grain follows the existing member UVs at the
+source's one-metre scale. Source
+licenses accompany each set in `public/materials`. Existing numeric choices
+remain unchanged; the new table choices are 5 and 6, groove choices 6 and 7.
+If a map fails, the viewer falls back to a procedural color/grain material.

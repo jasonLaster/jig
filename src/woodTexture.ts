@@ -6,6 +6,8 @@ export const WOOD_FINISHES = [
   { species: "maple", label: "Maple", base: [224, 202, 161] },
   { species: "ash", label: "Ash", base: [201, 185, 151] },
   { species: "cherry", label: "Cherry", base: [174, 103, 65] },
+  { species: "smoked-walnut", label: "Smoked walnut", base: [143, 108, 76] },
+  { species: "natural-walnut", label: "Natural walnut", base: [124, 107, 87] },
 ] as const;
 
 export type WoodSpecies = (typeof WOOD_FINISHES)[number]["species"];

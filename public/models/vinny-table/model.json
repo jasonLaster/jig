@@ -18,8 +18,8 @@
     "channelCount": 3
   },
   "parameters": [
-    { "key": "tableWood", "label": "Table wood", "group": "Overall", "default": 0, "limits": { "min": 0, "max": 4, "step": 1 } },
-    { "key": "grooveWood", "label": "Groove wood", "group": "Tabletop", "default": 0, "limits": { "min": 0, "max": 5, "step": 1 } },
+    { "key": "tableWood", "label": "Table wood", "group": "Overall", "default": 0, "limits": { "min": 0, "max": 6, "step": 1 } },
+    { "key": "grooveWood", "label": "Groove wood", "group": "Tabletop", "default": 0, "limits": { "min": 0, "max": 7, "step": 1 } },
     { "key": "mockScale", "label": "Mock scale denominator", "group": "Overall", "statusLabel": "Scale 1:", "default": 10, "limits": { "min": 6, "max": 24, "step": 1 } },
     { "key": "tableLength", "label": "Table length", "group": "Overall", "statusLabel": "Length", "default": 2438.4, "limits": { "min": 1828.8, "max": 3048, "step": 25.4 } },
     { "key": "tableWidth", "label": "Table width", "group": "Overall", "statusLabel": "Width", "default": 1016, "limits": { "min": 812.8, "max": 1219.2, "step": 25.4 } },

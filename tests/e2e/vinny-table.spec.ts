@@ -477,7 +477,7 @@ test("switches table and groove wood independently and restores both from the UR
   await page.getByRole("option", { name: "Walnut", exact: true }).click();
   await page.getByRole("button", { name: "Tabletop", exact: true }).click();
   await expect(page.getByLabel("Vinny groove wood")).toContainText("Same as table");
-  for (const name of ["Oak", "Walnut", "Maple", "Ash", "Cherry"]) {
+  for (const name of WOOD_FINISHES.map((finish) => finish.label)) {
     await page.getByLabel("Vinny groove wood").click();
     await page.getByRole("option", { name, exact: true }).click();
     await expect(page.getByLabel("Vinny table wood")).toContainText("Walnut");
@@ -500,5 +500,30 @@ test("switches table and groove wood independently and restores both from the UR
   await page.getByRole("button", { name: "Cut list", exact: true }).click();
   await expect(page.getByTestId("vinny-cut-list")).toContainText("Walnut");
   await expect(page.getByTestId("vinny-cut-list")).toContainText("Groove finish: Maple");
+  expect(errors).toEqual([]);
+});
+
+
+test("loads natural walnut material maps and preserves the new finishes on reload", async ({ page }) => {
+  const errors: string[] = [];
+  const maps = new Set<string>();
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("response", (response) => {
+    if (/materials\/(smoked|natural)-walnut-veneer\/.*\.webp/.test(response.url()) && response.ok()) {
+      maps.add(new URL(response.url()).pathname);
+    }
+  });
+  await page.goto("/?model=vinny-table&tableWood=5&grooveWood=7&quality=high&unit=in");
+  await expect.poll(() => maps.size).toBe(6);
+  await expect(page.getByLabel("Vinny table wood")).toContainText("Smoked walnut");
+  await page.getByRole("button", { name: "Tabletop", exact: true }).click();
+  await expect(page.getByLabel("Vinny groove wood")).toContainText("Natural walnut");
+  await page.getByLabel("Vinny table wood").click();
+  await page.getByRole("option", { name: "Natural walnut", exact: true }).click();
+  await expect(page).toHaveURL(/tableWood=6/);
+  await page.reload();
+  await expect(page.getByLabel("Vinny table wood")).toContainText("Natural walnut");
+  await page.getByRole("button", { name: "Tabletop", exact: true }).click();
+  await expect(page.getByLabel("Vinny groove wood")).toContainText("Natural walnut");
   expect(errors).toEqual([]);
 });
