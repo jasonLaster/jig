@@ -123,6 +123,7 @@ import {
   stepLengthInput,
   toUnit,
 } from "./units";
+import { recordFlyover } from "./recordFlyover";
 import { getVinnyFinishes } from "./models/vinnyFinishes";
 import { WOOD_FINISHES, createWoodTexture, getWoodSpeciesForModel } from "./woodTexture";
 import {
@@ -151,6 +152,7 @@ type MobileInspectorSection = "assembly" | "parameters" | "checks";
 
 type ViewerHandle = {
   captureBrochureViews: () => Promise<string[]>;
+  exportFlyover: () => Promise<void>;
   exportStl: () => void;
   exportLidStl: () => void;
   exportBoxAndLidStl: () => void;
@@ -1163,6 +1165,7 @@ const HolderViewer = forwardRef<
   const sceneRef = useRef<THREE.Scene | null>(null);
   const pathTracerRef = useRef<WebGLPathTracer | null>(null);
   const pathTracerRefreshRef = useRef<number | null>(null);
+  const flyoverAbortRef = useRef<AbortController | null>(null);
   const mainMeshRef = useRef<THREE.Mesh | null>(null);
   const domeMeshRef = useRef<THREE.Mesh | null>(null);
   const sandMeshRef = useRef<THREE.Mesh | null>(null);
@@ -1924,6 +1927,25 @@ const HolderViewer = forwardRef<
     downloadNext(0);
   }, [model]);
 
+  const exportFlyover = useCallback(async () => {
+    const scene = sceneRef.current;
+    const renderer = rendererRef.current;
+    if (!scene || !renderer || !scene.getObjectByName(`${model.id}-adjustable-body`)) {
+      throw new Error("The model is still loading. Please try again in a moment.");
+    }
+    if (flyoverAbortRef.current) return;
+    const controller = new AbortController();
+    flyoverAbortRef.current = controller;
+    try {
+      const blob = await recordFlyover(
+        scene, renderer, getModelDimensions(model, latestParamsRef.current), model.id, controller.signal,
+      );
+      downloadBlob(blob, `${model.id}-flyover.${blob.type.startsWith("video/mp4") ? "mp4" : "webm"}`);
+    } finally {
+      flyoverAbortRef.current = null;
+    }
+  }, [model]);
+
   const captureBrochureViews = useCallback(async () => {
     if (
       model.viewer !== "hover-dining-table-v1" &&
@@ -1993,6 +2015,7 @@ const HolderViewer = forwardRef<
     ref,
     () => ({
       captureBrochureViews,
+      exportFlyover,
       exportStl,
       exportLidStl,
       exportBoxAndLidStl,
@@ -2001,7 +2024,7 @@ const HolderViewer = forwardRef<
       resetCamera,
       setView: setCameraView,
     }),
-    [captureBrochureViews, createStlBlob, exportBoxAndLidStl, exportHoverTemplateStls, exportLidStl, exportStl, resetCamera, setCameraView],
+    [captureBrochureViews, exportFlyover, createStlBlob, exportBoxAndLidStl, exportHoverTemplateStls, exportLidStl, exportStl, resetCamera, setCameraView],
   );
 
   useEffect(() => {
@@ -2530,6 +2553,7 @@ const HolderViewer = forwardRef<
 
     return () => {
       disposed = true;
+      flyoverAbortRef.current?.abort();
       if (animationRef.current !== null) {
         cancelAnimationFrame(animationRef.current);
       }
@@ -5169,6 +5193,7 @@ function WorkspaceActionsMenu({
   unit,
   onCreateStlBlob,
   onExport,
+  onExportFlyover,
   onExportLid,
   onExportBoxAndLid,
   onExportHoverTemplates,
@@ -5190,6 +5215,7 @@ function WorkspaceActionsMenu({
   unit: LengthUnit;
   onCreateStlBlob: () => Blob | null;
   onExport: () => void;
+  onExportFlyover: () => Promise<void>;
   onExportLid: () => void;
   onExportBoxAndLid: () => void;
   onExportHoverTemplates: () => void;
@@ -5200,6 +5226,19 @@ function WorkspaceActionsMenu({
   onThemeChange: (theme: ThemeMode) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [flyoverState, setFlyoverState] = useState<"idle" | "recording" | "done" | "error">("idle");
+  const [flyoverError, setFlyoverError] = useState("");
+  const handleFlyover = async () => {
+    setFlyoverState("recording");
+    setFlyoverError("");
+    try {
+      await onExportFlyover();
+      setFlyoverState("done");
+    } catch (error) {
+      setFlyoverError(error instanceof Error ? error.message : String(error));
+      setFlyoverState("error");
+    }
+  };
   const isDark = theme === "dark";
 
   return (
@@ -5300,6 +5339,15 @@ function WorkspaceActionsMenu({
                   ? "Export two-color STLs"
                   : "Export"}
               </button>
+              <button disabled={flyoverState === "recording"} onClick={handleFlyover} type="button">
+                <Download aria-hidden="true" />
+                {flyoverState === "recording" ? "Recording flyover…" : "Download flyover"}
+              </button>
+              {flyoverState !== "idle" && (
+                <p className={`save-status${flyoverState === "error" ? " error" : ""}`} role={flyoverState === "error" ? "alert" : "status"}>
+                  {flyoverState === "recording" ? "Creating your 8-second video…" : flyoverState === "done" ? "Flyover downloaded" : flyoverError}
+                </p>
+              )}
               {model.viewer === "simple-box-v1" ? (
                 <>
                   <button onClick={onExportLid} type="button">
@@ -5340,6 +5388,7 @@ function WorkspaceHeader({
   unit,
   onCreateStlBlob,
   onExport,
+  onExportFlyover,
   onExportLid,
   onExportBoxAndLid,
   onExportHoverTemplates,
@@ -5364,6 +5413,7 @@ function WorkspaceHeader({
   unit: LengthUnit;
   onCreateStlBlob: () => Blob | null;
   onExport: () => void;
+  onExportFlyover: () => Promise<void>;
   onExportLid: () => void;
   onExportBoxAndLid: () => void;
   onExportHoverTemplates: () => void;
@@ -5402,6 +5452,7 @@ function WorkspaceHeader({
           model={model}
           onCreateStlBlob={onCreateStlBlob}
           onExport={onExport}
+          onExportFlyover={onExportFlyover}
           onExportLid={onExportLid}
           onExportBoxAndLid={onExportBoxAndLid}
           onExportHoverTemplates={onExportHoverTemplates}
@@ -6334,6 +6385,10 @@ export default function App({
         model={model}
         onCreateStlBlob={() => viewerRef.current?.getStlBlob() ?? null}
         onExport={() => viewerRef.current?.exportStl()}
+        onExportFlyover={async () => {
+          if (!viewerRef.current) throw new Error("The model is still loading. Please try again.");
+          await viewerRef.current.exportFlyover();
+        }}
         onExportLid={() => viewerRef.current?.exportLidStl()}
         onExportBoxAndLid={() => viewerRef.current?.exportBoxAndLidStl()}
         onExportHoverTemplates={() =>
