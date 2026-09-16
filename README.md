@@ -21,13 +21,16 @@ Each model owns its public configuration and registered STL under
 `public/models/<model-id>/`. Table geometry, fabrication layouts, audits, and
 exports share the same parametric source so the surfaces stay synchronized.
 
-## Flyover download
+## Flyover preview and download
 
-Open **Workspace actions → Download flyover** to save an eight-second, 720p
-orbit video of the current model and finishes. Recording uses a separate scene
+Open **Workspace actions → Preview flyover** to play an eight-second, 720p
+orbit video of the current model and finishes. The player has playback controls
+and a **Download video** button; **Download flyover** in the dropdown saves it
+directly. The finished video is reused for previews and downloads until the model
+parameters or appearance changes. Recording uses a separate scene
 snapshot and leaves the interactive camera unchanged. The browser saves WebM
 (or MP4 when that is the supported format); the dropdown shows recording and
-error status. Changing the model, theme, or render quality cancels an active
+error status. Changing model parameters, finishes, theme, or render settings cancels an active
 recording. Video uses real-time rendering, including when Photo mode is selected.
 
 ## Development

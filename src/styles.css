@@ -4051,3 +4051,49 @@ html.dark .segmented-control button.active {
     animation-iteration-count: 1 !important;
   }
 }
+
+.flyover-video-dialog {
+  width: min(960px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  color: var(--foreground);
+  background: var(--surface-popover);
+  box-shadow: 0 28px 80px var(--shadow-strong);
+}
+
+.flyover-video-dialog::backdrop { background: rgba(2, 6, 12, 0.72); }
+.flyover-video-heading, .flyover-video-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.flyover-video-heading h2 { margin: 0; font-size: 18px; }
+.flyover-video-dialog video {
+  display: block;
+  width: 100%;
+  max-height: calc(100dvh - 180px);
+  aspect-ratio: 16 / 9;
+  margin: 16px 0;
+  border-radius: 6px;
+  background: #101318;
+}
+.flyover-video-actions span { color: var(--muted); font-size: 12px; }
+.flyover-video-dialog button {
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 650;
+}
+.flyover-video-actions button {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+.flyover-video-heading button:hover { background: var(--control-hover); }

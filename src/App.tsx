@@ -17,6 +17,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Plus,
+  Play,
   RotateCcw,
   Ruler,
   Search,
@@ -124,6 +125,7 @@ import {
   toUnit,
 } from "./units";
 import { recordFlyover } from "./recordFlyover";
+import { FlyoverVideoDialog, useFlyoverVideo } from "./FlyoverVideo";
 import { getVinnyFinishes } from "./models/vinnyFinishes";
 import { WOOD_FINISHES, createWoodTexture, getWoodSpeciesForModel } from "./woodTexture";
 import { disposeWoodMaterial, loadWalnutMaterial } from "./walnutPbr";
@@ -153,7 +155,7 @@ type MobileInspectorSection = "assembly" | "parameters" | "checks";
 
 type ViewerHandle = {
   captureBrochureViews: () => Promise<string[]>;
-  exportFlyover: () => Promise<void>;
+  exportFlyover: (signal: AbortSignal) => Promise<Blob>;
   exportStl: () => void;
   exportLidStl: () => void;
   exportBoxAndLidStl: () => void;
@@ -1928,21 +1930,24 @@ const HolderViewer = forwardRef<
     downloadNext(0);
   }, [model]);
 
-  const exportFlyover = useCallback(async () => {
+  const exportFlyover = useCallback(async (signal: AbortSignal) => {
     const scene = sceneRef.current;
     const renderer = rendererRef.current;
     if (!scene || !renderer || !scene.getObjectByName(`${model.id}-adjustable-body`)) {
       throw new Error("The model is still loading. Please try again in a moment.");
     }
-    if (flyoverAbortRef.current) return;
+    if (flyoverAbortRef.current) throw new Error("A flyover is already recording. Please try again shortly.");
+    signal.throwIfAborted();
     const controller = new AbortController();
     flyoverAbortRef.current = controller;
+    const abort = () => controller.abort();
+    signal.addEventListener("abort", abort, { once: true });
     try {
-      const blob = await recordFlyover(
+      return await recordFlyover(
         scene, renderer, getModelDimensions(model, latestParamsRef.current), model.id, controller.signal,
       );
-      downloadBlob(blob, `${model.id}-flyover.${blob.type.startsWith("video/mp4") ? "mp4" : "webm"}`);
     } finally {
+      signal.removeEventListener("abort", abort);
       flyoverAbortRef.current = null;
     }
   }, [model]);
@@ -5230,7 +5235,7 @@ function WorkspaceActionsMenu({
   unit: LengthUnit;
   onCreateStlBlob: () => Blob | null;
   onExport: () => void;
-  onExportFlyover: () => Promise<void>;
+  onExportFlyover: (signal: AbortSignal) => Promise<Blob>;
   onExportLid: () => void;
   onExportBoxAndLid: () => void;
   onExportHoverTemplates: () => void;
@@ -5241,18 +5246,17 @@ function WorkspaceActionsMenu({
   onThemeChange: (theme: ThemeMode) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [flyoverState, setFlyoverState] = useState<"idle" | "recording" | "done" | "error">("idle");
-  const [flyoverError, setFlyoverError] = useState("");
-  const handleFlyover = async () => {
-    setFlyoverState("recording");
-    setFlyoverError("");
-    try {
-      await onExportFlyover();
-      setFlyoverState("done");
-    } catch (error) {
-      setFlyoverError(error instanceof Error ? error.message : String(error));
-      setFlyoverState("error");
-    }
+  const flyover = useFlyoverVideo(
+    JSON.stringify({ model: model.id, params, renderQuality, renderMode, theme, showOriginal }),
+    onExportFlyover,
+  );
+  const previewFlyoverButtonRef = useRef<HTMLButtonElement>(null);
+  const closeFlyoverPreview = () => {
+    flyover.setPreviewOpen(false);
+    requestAnimationFrame(() => previewFlyoverButtonRef.current?.focus());
+  };
+  const downloadFlyover = (blob: Blob) => {
+    downloadBlob(blob, `${model.id}-flyover.${blob.type.startsWith("video/mp4") ? "mp4" : "webm"}`);
   };
   const isDark = theme === "dark";
 
@@ -5354,13 +5358,17 @@ function WorkspaceActionsMenu({
                   ? "Export two-color STLs"
                   : "Export"}
               </button>
-              <button disabled={flyoverState === "recording"} onClick={handleFlyover} type="button">
-                <Download aria-hidden="true" />
-                {flyoverState === "recording" ? "Recording flyover…" : "Download flyover"}
+              <button ref={previewFlyoverButtonRef} disabled={flyover.state === "recording"} onClick={() => flyover.create("preview", downloadFlyover)} type="button">
+                <Play aria-hidden="true" />
+                Preview flyover
               </button>
-              {flyoverState !== "idle" && (
-                <p className={`save-status${flyoverState === "error" ? " error" : ""}`} role={flyoverState === "error" ? "alert" : "status"}>
-                  {flyoverState === "recording" ? "Creating your 8-second video…" : flyoverState === "done" ? "Flyover downloaded" : flyoverError}
+              <button disabled={flyover.state === "recording"} onClick={() => flyover.create("download", downloadFlyover)} type="button">
+                <Download aria-hidden="true" />
+                {flyover.state === "recording" ? "Recording flyover…" : "Download flyover"}
+              </button>
+              {flyover.state !== "idle" && (
+                <p className={`save-status${flyover.state === "error" ? " error" : ""}`} role={flyover.state === "error" ? "alert" : "status"}>
+                  {flyover.state === "recording" ? "Creating your 8-second video…" : flyover.state === "done" ? "Flyover ready to preview or download" : flyover.error}
                 </p>
               )}
               {model.viewer === "simple-box-v1" ? (
@@ -5385,6 +5393,14 @@ function WorkspaceActionsMenu({
           </div>
         </>
       ) : null}
+      {flyover.previewOpen && flyover.video && (
+        <FlyoverVideoDialog
+          url={flyover.video.url}
+          modelName={model.name}
+          onClose={closeFlyoverPreview}
+          onDownload={() => downloadFlyover(flyover.video!.blob)}
+        />
+      )}
     </div>
   );
 }
@@ -5428,7 +5444,7 @@ function WorkspaceHeader({
   unit: LengthUnit;
   onCreateStlBlob: () => Blob | null;
   onExport: () => void;
-  onExportFlyover: () => Promise<void>;
+  onExportFlyover: (signal: AbortSignal) => Promise<Blob>;
   onExportLid: () => void;
   onExportBoxAndLid: () => void;
   onExportHoverTemplates: () => void;
@@ -6400,9 +6416,9 @@ export default function App({
         model={model}
         onCreateStlBlob={() => viewerRef.current?.getStlBlob() ?? null}
         onExport={() => viewerRef.current?.exportStl()}
-        onExportFlyover={async () => {
+        onExportFlyover={async (signal) => {
           if (!viewerRef.current) throw new Error("The model is still loading. Please try again.");
-          await viewerRef.current.exportFlyover();
+          return viewerRef.current.exportFlyover(signal);
         }}
         onExportLid={() => viewerRef.current?.exportLidStl()}
         onExportBoxAndLid={() => viewerRef.current?.exportBoxAndLidStl()}
