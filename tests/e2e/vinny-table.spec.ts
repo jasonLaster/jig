@@ -15,7 +15,8 @@ import {
   getVinnyTableFabricationSpec,
 } from "../../src/models/vinnyTable";
 import type { DiningTableModelDefinition } from "../../src/models/types";
-import { getWoodSpeciesForModel } from "../../src/woodTexture";
+import { getVinnyFinishes } from "../../src/models/vinnyFinishes";
+import { WOOD_FINISHES, getWoodSpeciesForModel } from "../../src/woodTexture";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const model = JSON.parse(
@@ -422,4 +423,82 @@ test("loads the live Vinny model and its parameter-driven cut sheet", async ({ p
     "vinny-table-scale-1-10-length-2438.4-width-1016.0-support-free-wood-color-1.stl",
   ]);
   expect(consoleErrors).toEqual([]);
+});
+
+
+test("assigns only the recessed groove faces to a separate finish without changing the solid", () => {
+  const params = getDefaultParams(model);
+  const baseline = createDiningTableWoodGeometry(params, model);
+  const contrast = createDiningTableWoodGeometry({ ...params, tableWood: 1, grooveWood: 3 }, model);
+  for (const attribute of ["position", "normal", "uv"]) {
+    expect(contrast.getAttribute(attribute).array).toEqual(baseline.getAttribute(attribute).array);
+  }
+  const positions = contrast.getAttribute("position");
+  const grooveGroups = contrast.groups.filter((group) => group.materialIndex === 1);
+  expect(grooveGroups).toHaveLength(1);
+  expect(grooveGroups[0].count).toBeGreaterThan(0);
+  const bottom = (params.overallHeight - params.topThickness) / params.mockScale;
+  const ceiling = bottom + params.flushGrooveDepth / params.mockScale;
+  for (const group of grooveGroups) {
+    for (let vertex = group.start; vertex < group.start + group.count; vertex++) {
+      expect(positions.getZ(vertex)).toBeGreaterThanOrEqual(bottom - 1e-5);
+      expect(positions.getZ(vertex)).toBeLessThanOrEqual(ceiling + 1e-5);
+    }
+  }
+  let covered = 0;
+  for (const group of contrast.groups) {
+    expect(group.start).toBe(covered);
+    covered += group.count;
+  }
+  expect(covered).toBe(positions.count);
+  for (const extra of [{ topStyle: 1 }, { flushGrooveWidth: 0 }, { flushGrooveDepth: 0 }]) {
+    const plain = createDiningTableWoodGeometry({ ...params, ...extra }, model);
+    expect(plain.groups.every((group) => group.materialIndex === 0)).toBe(true);
+    plain.dispose();
+  }
+  expect(getVinnyFinishes({})).toEqual({ table: WOOD_FINISHES[0], groove: WOOD_FINISHES[0] });
+  for (let index = 0; index < WOOD_FINISHES.length; index++) {
+    expect(getVinnyFinishes({ tableWood: index, grooveWood: 0 }).groove).toBe(WOOD_FINISHES[index]);
+    expect(getVinnyFinishes({ tableWood: 1, grooveWood: index + 1 }).groove).toBe(WOOD_FINISHES[index]);
+  }
+  const parts = getVinnyTableCutList({ ...params, tableWood: 1, grooveWood: 3, supportMode: 1 });
+  expect(parts.find((part) => part.id === "T1")).toMatchObject({ material: "Walnut", notes: expect.stringContaining("Groove finish: Maple") });
+  expect(parts.find((part) => part.id === "H1")!.material).toBe("Steel");
+  baseline.dispose();
+  contrast.dispose();
+});
+
+test("switches table and groove wood independently and restores both from the URL", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/?model=vinny-table&unit=in");
+  await expect(page.locator(".viewer canvas")).toBeVisible();
+  await page.getByLabel("Vinny table wood").click();
+  await page.getByRole("option", { name: "Walnut", exact: true }).click();
+  await page.getByRole("button", { name: "Tabletop", exact: true }).click();
+  await expect(page.getByLabel("Vinny groove wood")).toContainText("Same as table");
+  for (const name of ["Oak", "Walnut", "Maple", "Ash", "Cherry"]) {
+    await page.getByLabel("Vinny groove wood").click();
+    await page.getByRole("option", { name, exact: true }).click();
+    await expect(page.getByLabel("Vinny table wood")).toContainText("Walnut");
+    await expect(page.getByLabel("Vinny groove wood")).toContainText(name);
+  }
+  await page.getByLabel("Vinny groove wood").click();
+  await page.getByRole("option", { name: "Maple", exact: true }).click();
+  await expect(page).toHaveURL(/tableWood=1/);
+  await expect(page).toHaveURL(/grooveWood=3/);
+  await page.reload();
+  await expect(page.getByLabel("Vinny table wood")).toContainText("Walnut");
+  await page.getByRole("button", { name: "Tabletop", exact: true }).click();
+  await expect(page.getByLabel("Vinny groove wood")).toContainText("Maple");
+  await page.getByLabel("Vinny top style").click();
+  await page.getByRole("option", { name: "Overhang", exact: true }).click();
+  await expect(page.getByLabel("Vinny groove wood")).toHaveCount(0);
+  await page.getByLabel("Vinny top style").click();
+  await page.getByRole("option", { name: "Flush · shadow groove", exact: true }).click();
+  await expect(page.getByLabel("Vinny groove wood")).toContainText("Maple");
+  await page.getByRole("button", { name: "Cut list", exact: true }).click();
+  await expect(page.getByTestId("vinny-cut-list")).toContainText("Walnut");
+  await expect(page.getByTestId("vinny-cut-list")).toContainText("Groove finish: Maple");
+  expect(errors).toEqual([]);
 });

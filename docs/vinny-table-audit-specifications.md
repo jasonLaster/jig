@@ -61,3 +61,14 @@ The composite weights are 23% long-apron racking, 22% end-frame racking, 20% tor
 ## Physical validation boundary
 
 This is a geometry-only screen, not engineering certification. Before build approval, verify actual stock, the chosen joint method, tabletop movement allowance, corner fit, fastener clearances, full-size lateral racking, rocking on the destination floor, tabletop deflection, tipping behavior, and repeated-load durability. The physical result overrides this screen.
+
+## Wood finishes
+
+Table wood and groove wood are saved model parameters. Oak, walnut, maple, ash,
+and cherry are available; the groove defaults to Same as table. The separate
+finish covers the existing recessed wall and underside shoulder of the flush
+shadow groove. Overhang tops hide this control and have no groove material faces.
+Species changes preserve all positions, normals, grain coordinates, dimensions,
+structural scores, and STL geometry. The cut sheet names the chosen table wood
+and records the groove finish on the tabletop row. These are appearance choices;
+they do not specify an inlay construction or separate inlay cutting dimensions.

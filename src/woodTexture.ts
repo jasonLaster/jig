@@ -1,6 +1,14 @@
 import * as THREE from "three";
 
-export type WoodSpecies = "oak" | "walnut";
+export const WOOD_FINISHES = [
+  { species: "oak", label: "Oak", base: [180, 143, 97] },
+  { species: "walnut", label: "Walnut", base: [92, 58, 39] },
+  { species: "maple", label: "Maple", base: [224, 202, 161] },
+  { species: "ash", label: "Ash", base: [201, 185, 151] },
+  { species: "cherry", label: "Cherry", base: [174, 103, 65] },
+] as const;
+
+export type WoodSpecies = (typeof WOOD_FINISHES)[number]["species"];
 
 const WOOD_SPECIES_BY_MODEL: Readonly<Partial<Record<string, WoodSpecies>>> = {
   "dining-table": "oak",
@@ -26,10 +34,11 @@ export function createWoodTexture(
 
   const image = context.createImageData(canvas.width, canvas.height);
   const walnut = species === "walnut";
-  const base = walnut ? [92, 58, 39] : [180, 143, 97];
+  const base = WOOD_FINISHES.find((finish) => finish.species === species)!.base;
   let seed = walnut ? 0x77616c6e : 0x5f3759df;
   for (let y = 0; y < canvas.height; y += 1) {
-    const broad = Math.sin(y * 0.072) * 5 + Math.sin(y * 0.019) * 7;
+    const grainStrength = species === "maple" ? 0.35 : species === "ash" ? 1.4 : 1;
+    const broad = (Math.sin(y * 0.072) * 5 + Math.sin(y * 0.019) * 7) * grainStrength;
     for (let x = 0; x < canvas.width; x += 1) {
       seed = (seed * 1664525 + 1013904223) >>> 0;
       const noise = ((seed & 255) / 255 - 0.5) * (walnut ? 7 : 0.8);

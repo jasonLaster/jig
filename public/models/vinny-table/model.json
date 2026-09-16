@@ -2,7 +2,7 @@
   "id": "vinny-table",
   "name": "Vinny Table",
   "subtitle": "Plan-derived corner-leg dining table",
-  "description": "A parametric 1:10 solid-oak model of the 96 × 40 inch Vinny dining table, with grouped direct dimensions, rounded leg edges, square apron joinery lands, an outer-only apron roundover, optional wood stretchers or steel C-channels, four calculated-angle diagonal corner blocks, and independent leveling feet.",
+  "description": "A parametric 1:10 solid-wood model of the 96 × 40 inch Vinny dining table, with grouped direct dimensions, rounded leg edges, square apron joinery lands, an outer-only apron roundover, optional wood stretchers or steel C-channels, four calculated-angle diagonal corner blocks, and independent leveling feet.",
   "viewer": "dining-table-v1",
   "stl": {
     "fileName": "vinny-table.stl",
@@ -18,6 +18,8 @@
     "channelCount": 3
   },
   "parameters": [
+    { "key": "tableWood", "label": "Table wood", "group": "Overall", "default": 0, "limits": { "min": 0, "max": 4, "step": 1 } },
+    { "key": "grooveWood", "label": "Groove wood", "group": "Tabletop", "default": 0, "limits": { "min": 0, "max": 5, "step": 1 } },
     { "key": "mockScale", "label": "Mock scale denominator", "group": "Overall", "statusLabel": "Scale 1:", "default": 10, "limits": { "min": 6, "max": 24, "step": 1 } },
     { "key": "tableLength", "label": "Table length", "group": "Overall", "statusLabel": "Length", "default": 2438.4, "limits": { "min": 1828.8, "max": 3048, "step": 25.4 } },
     { "key": "tableWidth", "label": "Table width", "group": "Overall", "statusLabel": "Width", "default": 1016, "limits": { "min": 812.8, "max": 1219.2, "step": 25.4 } },

@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { getVinnyFinishes } from "./vinnyFinishes";
+import { WOOD_FINISHES } from "../woodTexture";
 import { formatLength } from "../units";
 import { getParam, getParameter } from "./shared";
 import { assignDirectionalWoodUvs } from "./woodGrainUvs";
@@ -342,11 +344,17 @@ function createVinnyTopGeometry(params: ModelParams) {
   } else {
     addLayer(top, 0);
   }
-  return createLoftGeometry(
+  const geometry = createLoftGeometry(
     layers,
     new THREE.Vector3(1, 0, 0),
     textureSize(params),
   );
+  // The first two loft bands are the recessed wall and underside shoulder.
+  // Assign their existing triangles; changing a finish never changes the solid.
+  const grooveVertices = grooved ? layers[0].points.length * 6 * 2 : 0;
+  if (grooveVertices) geometry.addGroup(0, grooveVertices, 1);
+  geometry.addGroup(grooveVertices, geometry.getAttribute("position").count - grooveVertices, 0);
+  return geometry;
 }
 
 function advancedLegRing(
@@ -947,8 +955,11 @@ export function createVinnyTableWoodGeometry(params: ModelParams) {
     vertexStart += vertexCount;
     return part;
   });
+  const grooveVertices = geometries[0].groups.find((group) => group.materialIndex === 1)?.count ?? 0;
   geometries.forEach((geometry) => geometry.dispose());
   if (!merged) throw new Error("Unable to merge Vinny table geometry");
+  if (grooveVertices) merged.addGroup(0, grooveVertices, 1);
+  merged.addGroup(grooveVertices, vertexStart - grooveVertices, 0);
   merged.userData.woodGrainParts = woodGrainParts;
   merged.computeBoundingBox();
   merged.computeBoundingSphere();
@@ -957,7 +968,7 @@ export function createVinnyTableWoodGeometry(params: ModelParams) {
 
 export type VinnyCutPart = {
   id: string;
-  material: "Oak" | "Steel";
+  material: (typeof WOOD_FINISHES)[number]["label"] | "Steel";
   name: string;
   quantity: number;
   length: number;
@@ -1032,6 +1043,7 @@ export function getVinnyTableCutList(params: ModelParams): VinnyCutPart[] {
           ? "Leave the top 3 in square and taper both inside faces to the specified foot."
           : "Keep the four post blanks square and straight."} Round the outside corner independently and round the other exposed vertical edges to their shared radius.${levelingFeetEnabled(params) ? " Length is shortened by the installed foot extension to preserve overall height." : ""}`,
       };
+  const { table, groove } = getVinnyFinishes(params);
   const scale = getParam(params, "mockScale");
   const support: VinnyCutPart = supportModeUsesChannels(params)
     ? {
@@ -1055,7 +1067,7 @@ export function getVinnyTableCutList(params: ModelParams): VinnyCutPart[] {
         notes: "One centered; outer two use the editable on-center spacing. Length is derived from the live inside faces of the two long aprons.",
       };
   const fabrication = getVinnyTableFabricationSpec(params);
-  return [
+  const parts: VinnyCutPart[] = [
     { id: "T1", material: "Oak", name: "Tabletop panel", quantity: 1, length: topLength, width: topWidth, thickness: topThickness, notes: `${isOverhang(params) ? "Centered over the smaller base." : "Flush to the base with the modeled perimeter shadow groove."} Shape the plan corners and top edge to the listed radii.` },
     legs,
     { id: "B1", material: "Oak", name: "Long aprons", quantity: 2, length: longApronLength(params) * scale, width: getParam(params, "apronHeight"), thickness: getParam(params, "apronThickness"), notes: "Length is derived from the table and leg widths. Round only the outer lower longitudinal edge; leave the inner edge and both end lands square for flush joinery." },
@@ -1074,6 +1086,13 @@ export function getVinnyTableCutList(params: ModelParams): VinnyCutPart[] {
         }]
       : []),
   ];
+  return parts.map((part) => ({
+    ...part,
+    material: part.material === "Steel" ? "Steel" : table.label,
+    notes: part.id === "T1" && !isOverhang(params)
+      ? `${part.notes} Groove finish: ${groove.label}.`
+      : part.notes,
+  }));
 }
 
 const WEIGHTS: Record<HoverDiningTableStructuralMetric["key"], number> = {

@@ -123,7 +123,8 @@ import {
   stepLengthInput,
   toUnit,
 } from "./units";
-import { createWoodTexture, getWoodSpeciesForModel } from "./woodTexture";
+import { getVinnyFinishes } from "./models/vinnyFinishes";
+import { WOOD_FINISHES, createWoodTexture, getWoodSpeciesForModel } from "./woodTexture";
 import {
   loadOakRenderingAssets,
   type OakRenderingAssets,
@@ -400,6 +401,8 @@ const PARAM_QUERY_KEYS = [
 ];
 const ANGLE_PARAM_KEYS = new Set(["rotation", "cutoutRotation"]);
 const SCALAR_PARAM_KEYS = new Set([
+  "tableWood",
+  "grooveWood",
   "dividerCount",
   "gridfinityCompatible",
   "legGrooveEnabled",
@@ -428,6 +431,8 @@ const CURVE_PARAM_KEYS = new Set([
   "frameInnerStileCurveTension",
 ]);
 const OPTION_PARAM_KEYS = new Set([
+  "tableWood",
+  "grooveWood",
   "gridfinityCompatible",
   "legGrooveEnabled",
   "endFrameStyle",
@@ -897,6 +902,7 @@ function applyRenderOptions(
   coreMode: CoreViewMode,
   renderMode: RenderMode,
   model: ModelDefinition,
+  extraMaterials: THREE.MeshStandardMaterial[] = [],
 ) {
   const isWeightedHolder = model.viewer === "weighted-paper-towel-holder-v1";
   const isCoreSection = isWeightedHolder && coreMode === "section";
@@ -919,7 +925,7 @@ function applyRenderOptions(
   const materials = secondaryMaterial
     ? [mainMaterial, secondaryMaterial]
     : [mainMaterial];
-  materials.forEach((material) => {
+  [...materials, ...extraMaterials].forEach((material) => {
     material.transparent = isTransparent;
     material.opacity = opacity;
     material.wireframe = isWireframe;
@@ -1169,6 +1175,7 @@ const HolderViewer = forwardRef<
   const hoverExplodedGroupRef = useRef<THREE.Group | null>(null);
   const ghostMeshRef = useRef<THREE.Mesh | null>(null);
   const guideMeshRef = useRef<THREE.Mesh | null>(null);
+  const vinnyMaterialsRef = useRef<Map<string, THREE.MeshStandardMaterial>>(new Map());
   const mainMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null);
   const domeMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null);
   const diningMetalMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null);
@@ -1326,7 +1333,7 @@ const HolderViewer = forwardRef<
     const hoverExplodedGroup = hoverExplodedGroupRef.current;
     const ghostMesh = ghostMeshRef.current;
     const guideMesh = guideMeshRef.current;
-    const holderMaterial = mainMaterialRef.current;
+    let holderMaterial = mainMaterialRef.current;
     const domeMaterial = domeMaterialRef.current;
     const diningMetalMaterial = diningMetalMaterialRef.current;
     const base = mainBaseRef.current;
@@ -1338,6 +1345,14 @@ const HolderViewer = forwardRef<
       !base
     ) {
       return;
+    }
+
+    if (model.id === "vinny-table") {
+      const { table, groove } = getVinnyFinishes(latestParamsRef.current);
+      holderMaterial = vinnyMaterialsRef.current.get(table.species) ?? holderMaterial;
+      const grooveMaterial = vinnyMaterialsRef.current.get(groove.species) ?? holderMaterial;
+      mainMaterialRef.current = holderMaterial;
+      mainMesh.material = [holderMaterial, grooveMaterial];
     }
 
     if (model.viewer === "weighted-paper-towel-holder-v1") {
@@ -1639,6 +1654,7 @@ const HolderViewer = forwardRef<
       latestCoreViewModeRef.current,
       latestRenderModeRef.current,
       model,
+      model.id === "vinny-table" ? [...vinnyMaterialsRef.current.values()] : [],
     );
 
     ghostMesh.visible =
@@ -2277,6 +2293,18 @@ const HolderViewer = forwardRef<
             side: THREE.DoubleSide,
           });
         mainMaterialRef.current = mainMaterial;
+        if (model.id === "vinny-table") {
+          vinnyMaterialsRef.current = new Map(WOOD_FINISHES.map(({ species }) => [
+            species,
+            species === "oak" ? mainMaterial : new THREE.MeshStandardMaterial({
+              color: "#ffffff",
+              map: createWoodTexture(renderer, species),
+              roughness: 0.72,
+              metalness: 0,
+              side: THREE.DoubleSide,
+            }),
+          ]));
+        }
         const domeMaterial = new THREE.MeshStandardMaterial({
           color: "#111318",
           roughness: 0.72,
@@ -2529,6 +2557,11 @@ const HolderViewer = forwardRef<
           }
         }
       });
+      for (const material of vinnyMaterialsRef.current.values()) {
+        if (material !== oakAssets?.material) material.map?.dispose();
+        material.dispose();
+      }
+      vinnyMaterialsRef.current.clear();
       oakAssets?.dispose();
       renderer.dispose();
       renderer.domElement.remove();
@@ -3554,6 +3587,29 @@ function VinnyParameterOptionControl({
   params: ModelParams;
   onChange: (key: string, value: number) => void;
 }) {
+  if (parameterKey === "tableWood" || parameterKey === "grooveWood") {
+    const isGroove = parameterKey === "grooveWood";
+    const label = isGroove ? "Groove wood" : "Table wood";
+    return (
+      <label>
+        <span>{label}</span>
+        <Select
+          value={String(params[parameterKey] ?? 0)}
+          onValueChange={(value) => onChange(parameterKey, Number(value))}
+        >
+          <SelectTrigger aria-label={`Vinny ${label.toLowerCase()}`}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {isGroove && <SelectItem value="0">Same as table</SelectItem>}
+            {WOOD_FINISHES.map((finish, index) => (
+              <SelectItem key={finish.species} value={String(index + (isGroove ? 1 : 0))}>
+                {finish.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+    );
+  }
   if (parameterKey === "legStyle") {
     return (
       <label>
@@ -3605,7 +3661,7 @@ function VinnyParameterOptionControl({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="0">Oak stretchers</SelectItem>
+            <SelectItem value="0">{getVinnyFinishes(params).table.label} stretchers</SelectItem>
             <SelectItem value="1">Steel C-channels</SelectItem>
           </SelectContent>
         </Select>
@@ -3666,7 +3722,7 @@ function VinnyTableParameterControls({
   const levelingFeet = getParam(params, "levelingFeetEnabled") >= 0.5;
   const isVisible = (key: string) => {
     if (!overhang && key === "topOverhang") return false;
-    if (overhang && (key === "flushGrooveWidth" || key === "flushGrooveDepth")) {
+    if (overhang && (key === "grooveWood" || key === "flushGrooveWidth" || key === "flushGrooveDepth")) {
       return false;
     }
     if (advanced && (key.startsWith("postLeg") || key === "postTaperStart")) {
