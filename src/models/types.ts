@@ -19,6 +19,7 @@ export type NumberLimits = {
 export type ModelParameter = {
   key: string;
   label: string;
+  description?: string;
   group?: string;
   statusLabel?: string;
   default: number;

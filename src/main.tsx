@@ -18,6 +18,7 @@ import App, {
   type SavedBrochure,
 } from "./App";
 import { subscribeToOptionalQuery } from "./optionalQuery";
+import { TooltipProvider } from "./components/ui/tooltip";
 import "./styles.css";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
@@ -143,12 +144,14 @@ const app = convexEnabled ? (
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {convexEnabled && convexUrl ? (
-      <ConvexProvider client={new ConvexReactClient(convexUrl)}>
-        {app}
-      </ConvexProvider>
-    ) : (
-      app
-    )}
+    <TooltipProvider delayDuration={300}>
+      {convexEnabled && convexUrl ? (
+        <ConvexProvider client={new ConvexReactClient(convexUrl)}>
+          {app}
+        </ConvexProvider>
+      ) : (
+        app
+      )}
+    </TooltipProvider>
   </React.StrictMode>,
 );

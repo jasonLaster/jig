@@ -68,6 +68,7 @@ import {
   HoverBrochurePanel,
   type BrochureGenerationState,
 } from "./components/HoverBrochurePanel";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./components/ui/tooltip";
 import { LeeStoolFabrication } from "./components/LeeStoolFabrication";
 import { createLeeStoolGeometry, normalizeLeeStoolParams } from "./models/leeStepStool";
 import { MiniModelViewer } from "./components/MiniModelViewer";
@@ -2818,6 +2819,7 @@ const HolderViewer = forwardRef<
 
 function NumberControl({
   label,
+  description,
   valueMm,
   limits,
   unit,
@@ -2834,6 +2836,7 @@ function NumberControl({
   onUnitChange: (unit: LengthUnit) => void;
   preferFineStep?: boolean;
   precisionDigits?: number;
+  description?: string;
 }) {
   const id = label.toLowerCase().replace(/\s+/g, "-");
   const unitId = `${id}-unit`;
@@ -2872,7 +2875,25 @@ function NumberControl({
 
   return (
     <div className="number-control">
-      <label htmlFor={id}>{label}</label>
+      <div className="number-control-label">
+        <label htmlFor={id}>{label}</label>
+        {description ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="parameter-info"
+                aria-label={`About ${label.toLowerCase()}`}
+              >
+                <Info aria-hidden="true" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>{description}</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
+      </div>
       <div className="number-row">
         <input
           id={id}
@@ -6691,6 +6712,7 @@ export default function App({
                             <NumberControl
                               key={key}
                               label={parameter.label}
+                              description={parameter.description}
                               valueMm={params[key]}
                               unit={unit}
                               limits={getParameterLimits(model, params, key)}
@@ -6712,6 +6734,7 @@ export default function App({
                           <div key={key}>
                             <NumberControl
                               label={parameter.label}
+                              description={parameter.description}
                               valueMm={params[key]}
                               unit={unit}
                               limits={getParameterLimits(model, params, key)}
@@ -6877,6 +6900,7 @@ export default function App({
                       <NumberControl
                         key={parameter.key}
                         label={parameter.label}
+                        description={parameter.description}
                         limits={getParameterLimits(model, params, parameter.key)}
                         onChange={(value) => updateParam(parameter.key, value)}
                         onUnitChange={setUnit}

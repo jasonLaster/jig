@@ -42,10 +42,11 @@ export function getLeeStoolSpec(p: ModelParams) {
   const clearance = getParam(p, "letterClearance"),
     fingerRadius = getParam(p, "fingerRadius");
   const minWidth = 31.75,
-    minHeight = 38.1;
+    minHeight = 38.1,
+    minGap = Math.max(6.35, 2 * clearance + 1.27);
   const letterMargin = Math.min(
     getParam(p, "letterMargin"),
-    (length - 3 * minWidth - 2 * 6.35 - 2 * clearance) / 2,
+    (length - 3 * minWidth - 2 * minGap - 2 * clearance) / 2,
     (width - minHeight - 2 * fingerRadius - 2 * clearance) / 2,
   );
   const centerX = length / 2 - legInset,
@@ -68,8 +69,8 @@ export function getLeeStoolSpec(p: ModelParams) {
   const gapLimit =
     (length - 2 * letterMargin - 3 * minWidth - 2 * clearance) / 2;
   const letterGap = fit(
-    6.35,
-    Math.min(getParam(p, "letterGap"), gapLimit),
+    minGap,
+    Math.max(minGap, Math.min(getParam(p, "letterGap"), gapLimit)),
     (gap) => layoutSafe(minWidth, minHeight, gap),
   );
   const widthLimit =
@@ -152,6 +153,8 @@ export function getLeeStoolParameterLimits(
     );
     limits.max = Math.min(limits.max, Math.min(s.length, s.width) / 4);
   }
+  if (key === "letterGap")
+    limits.min = Math.max(limits.min, 2 * s.clearance + 1.27);
   if (
     ["letterHeight", "letterWidth", "letterGap", "letterMargin"].includes(key)
   ) {
@@ -209,7 +212,10 @@ export function getLeeLetterContour(
     w = s.letterWidth,
     h = s.letterHeight;
   // Simple sans-serif strokes with soft corners and a shorter middle E arm.
-  const stroke = Math.min(w * 0.36, h * 0.24);
+  // Keep the E's inner notches open even at the maximum 3.175 mm fit
+  // clearance and minimum letter height. Inserts retain the same outline
+  // when only clearance changes.
+  const stroke = Math.min(w * 0.36, h * 0.24, (h - 4 * 3.175 - 2 * 1.27) / 3);
   const raw = (
     index === 0
       ? [

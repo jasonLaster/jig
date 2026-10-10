@@ -17,7 +17,7 @@ async function checkStl(file: string, expectedZ: number) {
   expect(maxZ).toBeCloseTo(expectedZ, 3);
 }
 
-test("opens Lee from library, shows source dimensions and real colored geometry", async ({
+test("opens Lee from library, shows selected default dimensions and real colored geometry", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -36,16 +36,16 @@ test("opens Lee from library, shows source dimensions and real colored geometry"
   await expect(page.locator(".scene-panel canvas")).toBeVisible();
   await expect(
     page.getByLabel("Top length in inches", { exact: true }),
-  ).toHaveValue("12 1/2");
+  ).toHaveValue("13");
   await expect(
     page.getByLabel("Top width in inches", { exact: true }),
-  ).toHaveValue("9 1/2");
+  ).toHaveValue("9");
   await expect(
     page.getByLabel("Top thickness in inches", { exact: true }),
   ).toHaveValue("1 1/2");
   await expect(
     page.getByLabel("Leg clearance in inches", { exact: true }),
-  ).toHaveValue("6");
+  ).toHaveValue("6 1/4");
   await page.screenshot({ path: ".playwright/lee-stool-assembled.png" });
   await page.getByText("Assembly & exports", { exact: true }).click();
   await page
@@ -57,13 +57,13 @@ test("opens Lee from library, shows source dimensions and real colored geometry"
   );
   await page.screenshot({ path: ".playwright/lee-stool-exploded.png" });
   await page.getByRole("button", { name: "Assemble stool" }).click();
-  await page.getByLabel("Top length in inches", { exact: true }).fill("13");
+  await page.getByLabel("Top length in inches", { exact: true }).fill("14");
   await page.getByLabel("Top length in inches", { exact: true }).blur();
-  await expect(page).toHaveURL(/length=13(&|$)/);
+  await expect(page).toHaveURL(/length=14(&|$)/);
   await page.reload();
   await expect(
     page.getByLabel("Top length in inches", { exact: true }),
-  ).toHaveValue("13");
+  ).toHaveValue("14");
   expect(errors).toEqual([]);
 });
 
@@ -71,7 +71,7 @@ test("couples pocket depth to floor stock and downloads actual parts and full-si
   page,
 }, testInfo) => {
   await page.goto(
-    "/?model=lee-step-stool&unit=mm&quality=standard&topThickness=31.75&letterDepth=38.1",
+    "/?model=lee-step-stool&unit=mm&quality=standard&topThickness=31.75&letterDepth=38.1&edgeRoundover=3.175",
   );
   await expect(
     page.getByLabel("Letter and pocket depth in millimeters", { exact: true }),
@@ -96,8 +96,8 @@ test("couples pocket depth to floor stock and downloads actual parts and full-si
   const templateFile = testInfo.outputPath("layout.svg");
   await template.saveAs(templateFile);
   const svg = await fs.readFile(templateFile, "utf8");
-  expect(svg).toContain('width="317.5mm"');
-  expect(svg).toContain('height="241.3mm"');
+  expect(svg).toContain('width="330.2mm"');
+  expect(svg).toContain('height="228.6mm"');
   expect(svg.match(/<circle /g)).toHaveLength(4);
   await page
     .getByRole("button", { name: "Workspace actions", exact: true })
@@ -107,7 +107,7 @@ test("couples pocket depth to floor stock and downloads actual parts and full-si
   const assembled = await assembledDownload;
   const assembledFile = testInfo.outputPath("assembled.stl");
   await assembled.saveAs(assembledFile);
-  await checkStl(assembledFile, 184.15);
+  await checkStl(assembledFile, 190.5);
 });
 
 test("renders on a narrow screen", async ({ page }) => {
@@ -132,7 +132,7 @@ test("keeps fine fit clearances and furniture rendering controls", async ({
     "Letter clearance per side in millimeters",
     { exact: true },
   );
-  await expect(clearance).toHaveValue("0.80");
+  await expect(clearance).toHaveValue("0.96");
   await clearance.fill("0.45");
   await clearance.blur();
   await expect(page).toHaveURL(/letterClearance=0.45(&|$)/);
@@ -203,4 +203,58 @@ test("edits rounded letter layout independently and uses shorter thicker leg pre
     path: ".playwright/lee-stool-rounded-short-legs.png",
   });
   expect(errors).toEqual([]);
+});
+
+test("explains fit clearances and persists values above the former limits", async ({
+  page,
+}) => {
+  await page.goto("/?model=lee-step-stool&unit=mm");
+  await expect(page.getByTestId("viewer-status")).toContainText("High render");
+  const letter = page.getByLabel("Letter clearance per side in millimeters", {
+    exact: true,
+  });
+  const socket = page.getByLabel(
+    "Leg socket clearance per side in millimeters",
+    { exact: true },
+  );
+  await expect(socket).toHaveValue("0.50");
+  await expect(
+    page.getByLabel("Letter clearance per side", { exact: true }),
+  ).toHaveAttribute("max", "3.175");
+  await expect(
+    page.getByLabel("Leg socket clearance per side", { exact: true }),
+  ).toHaveAttribute("max", "1.5875");
+  const letterInfo = page.getByRole("button", {
+    name: "About letter clearance per side",
+    exact: true,
+  });
+  await letterInfo.hover();
+  await expect(page.getByRole("tooltip")).toContainText(
+    "the letter size stays the same",
+  );
+  await page.screenshot({
+    path: ".playwright/lee-stool-clearance-tooltip.png",
+  });
+  await letter.fill("3");
+  await letter.blur();
+  await socket.fill("1.5");
+  await socket.blur();
+  await page.reload();
+  await expect(letter).toHaveValue("3.00");
+  await expect(socket).toHaveValue("1.50");
+  // Exercise actual keyboard navigation after the field has scrolled into view.
+  await socket.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Shift+Tab");
+  await expect(
+    page.getByRole("button", {
+      name: "About leg socket clearance per side",
+      exact: true,
+    }),
+  ).toBeFocused();
+  await expect(page.getByRole("tooltip")).toContainText(
+    "leg diameter plus twice this value",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
 });

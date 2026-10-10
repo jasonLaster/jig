@@ -2,7 +2,7 @@
   "id": "lee-step-stool",
   "name": "Lee Step Stool",
   "subtitle": "Sycamore, cherry & a little blue",
-  "description": "A rounded sycamore stool with four flush through cherry legs and removable blue LEE letters in a clean rounded sans-serif style. Letter height, width, horizontal gaps, wood border and fit are independently editable. Revised defaults use 6-inch leg clearance and 1½-inch legs.",
+  "description": "A rounded sycamore stool with four flush through cherry legs and removable blue LEE letters in a clean rounded sans-serif style. Letter height, width, horizontal gaps, wood border and fit are independently editable. Defaults use a 13 × 9 × 1½-inch top, 6¼-inch leg clearance and 1¼-inch legs.",
   "viewer": "lee-step-stool-v1",
   "stl": {
     "fileName": "lee-step-stool.stl",
@@ -24,22 +24,24 @@
     {
       "key": "length",
       "label": "Top length",
-      "default": 317.5,
+      "default": 330.2,
       "limits": {
         "min": 279.4,
         "max": 406.4,
         "step": 6.35
-      }
+      },
+      "description": "Overall length of the top. Letter layout stays centered as the top changes."
     },
     {
       "key": "width",
       "label": "Top width",
-      "default": 241.3,
+      "default": 228.6,
       "limits": {
         "min": 215.9,
         "max": 304.8,
         "step": 6.35
-      }
+      },
+      "description": "Overall front-to-back width of the top."
     },
     {
       "key": "topThickness",
@@ -49,37 +51,41 @@
         "min": 31.75,
         "max": 50.8,
         "step": 3.175
-      }
+      },
+      "description": "Thickness of the top. Pocket depth is limited to leave wood beneath the letters."
     },
     {
       "key": "legHeight",
       "label": "Leg clearance",
-      "default": 152.4,
+      "default": 158.75,
       "limits": {
         "min": 101.6,
         "max": 203.2,
         "step": 6.35
-      }
+      },
+      "description": "Distance from the floor to the underside of the top. Overall stool height also includes the top thickness."
     },
     {
       "key": "legDiameter",
       "label": "Leg diameter",
-      "default": 38.1,
+      "default": 31.75,
       "limits": {
         "min": 25.4,
         "max": 50.8,
         "step": 3.175
-      }
+      },
+      "description": "Diameter of each cylindrical leg. Socket diameter also includes the clearance on both sides."
     },
     {
       "key": "legInset",
       "label": "Leg center setback",
-      "default": 33.9,
+      "default": 35.43808,
       "limits": {
         "min": 25.4,
         "max": 63.5,
         "step": 1
-      }
+      },
+      "description": "Distance from each top edge to the center of a leg. The minimum adjusts to keep each socket inside the rounded top."
     },
     {
       "key": "cornerRadius",
@@ -89,17 +95,19 @@
         "min": 6.35,
         "max": 19.05,
         "step": 1.5875
-      }
+      },
+      "description": "Radius of the top corners when viewed from above."
     },
     {
       "key": "edgeRoundover",
       "label": "Edge roundover",
-      "default": 3.175,
+      "default": 6.09092,
       "limits": {
         "min": 1.5875,
         "max": 6.35,
         "step": 0.5
-      }
+      },
+      "description": "Radius of the rounded upper and lower edges of the top."
     },
     {
       "key": "letterHeight",
@@ -109,7 +117,8 @@
         "min": 38.1,
         "max": 127,
         "step": 3.175
-      }
+      },
+      "description": "Height of all three letters, independent of their width. The layout adjusts to preserve the wood border and avoid the sockets."
     },
     {
       "key": "letterMargin",
@@ -119,7 +128,8 @@
         "min": 12.7,
         "max": 63.5,
         "step": 3.175
-      }
+      },
+      "description": "Minimum wood border between the letter pockets and the top edges, including the finger wells."
     },
     {
       "key": "letterWidth",
@@ -129,7 +139,8 @@
         "min": 31.75,
         "max": 88.9,
         "step": 3.175
-      }
+      },
+      "description": "Width of each letter, independent of height. Horizontal gaps are measured between the letter edges."
     },
     {
       "key": "letterGap",
@@ -139,60 +150,68 @@
         "min": 6.35,
         "max": 50.8,
         "step": 1.5875
-      }
+      },
+      "description": "Horizontal distance between adjacent letter edges. Larger fit clearances require a little extra space between the pockets."
     },
     {
       "key": "letterDepth",
       "label": "Letter and pocket depth",
-      "default": 25.4,
+      "default": 19.05,
       "limits": {
         "min": 12.7,
         "max": 38.1,
         "step": 1.5875
-      }
+      },
+      "description": "Thickness of each removable letter and the depth of its blind pocket. Letters sit flush with the top."
     },
     {
       "key": "letterClearance",
       "label": "Letter clearance per side",
-      "default": 0.8,
+      "default": 0.96266,
       "limits": {
         "min": 0.15,
-        "max": 1,
+        "max": 3.175,
         "step": 0.05
-      }
+      },
+      "description": "Gap between a letter and its pocket on each side. Larger values make removal easier. The pocket grows by twice this value across its width and height; the letter size stays the same."
     },
     {
       "key": "legClearance",
       "label": "Leg socket clearance per side",
-      "default": 0.15,
+      "default": 0.50038,
       "limits": {
         "min": 0.05,
-        "max": 0.5,
+        "max": 1.5875,
         "step": 0.05
-      }
+      },
+      "description": "Radial gap between a leg and its socket. Socket diameter equals leg diameter plus twice this value. Larger values give a looser fit; the leg diameter stays the same."
     },
     {
       "key": "fingerRadius",
       "label": "Finger well radius",
-      "default": 10.16,
+      "default": 9.525,
       "limits": {
         "min": 6.35,
         "max": 12.7,
         "step": 0.5
-      }
+      },
+      "description": "Radius of the semicircular finger well below each letter, used to lift it out."
     }
   ],
   "audit": {
     "toleranceMm": 0.05,
     "dimensionTargets": [
-      "Top 12.5 × 9.5 × 1.5 inches; revised default 1.5-inch leg diameter and 6-inch floor-to-underside clearance. Leg diameter adjusts through 2 inches and clearance includes 5 and 6 inches.",
-      "Approximately 1-inch-deep letters with a positive blind pocket floor."
+      "User-selected defaults: top 13 × 9 × 1.5 inches, 1.25-inch leg diameter and 6.25-inch floor-to-underside clearance.",
+      "0.75-inch-deep letters with a positive blind pocket floor. Letter clearance supports 0.125 inch per side; leg socket clearance supports 0.0625 inch per side.",
+      "Independent 3.25-inch letter height, 2-inch letter width, 1-inch horizontal gaps and a 1.5-inch minimum wood border.",
+      "Positive blind pocket floors, at least 1.27 mm between adjacent pocket bounds and 3.175 mm between pocket bounds and sockets."
     ],
     "invariants": [
       "Keep three independent removable LEE inserts and four flush through legs.",
       "Keep pocket floors, fit gaps, sockets and rounded top in the same shared parametric geometry.",
       "Keep letter pockets separated from sockets and each other.",
-      "Preserve eight closed solids in assembled and individual part exports."
+      "Preserve eight closed solids in assembled and individual part exports.",
+      "Keep leg sockets inside the rounded top and normalize letter size and spacing to preserve the wood border."
     ],
     "checks": [
       {

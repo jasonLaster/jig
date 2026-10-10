@@ -47,12 +47,44 @@ try {
 const defaults = Object.fromEntries(
   model.parameters.map((p) => [p.key, p.default]),
 );
-assert.equal(defaults.length, 317.5);
-assert.equal(defaults.width, 241.3);
-assert.equal(defaults.topThickness, 38.1);
-assert.equal(defaults.legHeight, 152.4);
-assert.equal(defaults.legDiameter, 38.1);
-assert.equal(defaults.letterDepth, 25.4);
+// The release defaults reproduce the user's supplied inch URL exactly.
+const selectedInches = {
+  length: 13,
+  width: 9,
+  topThickness: 1.5,
+  legHeight: 6.25,
+  legDiameter: 1.25,
+  legInset: 1.3952,
+  cornerRadius: 0.5,
+  edgeRoundover: 0.2398,
+  letterHeight: 3.25,
+  letterMargin: 1.5,
+  letterWidth: 2,
+  letterGap: 1,
+  letterDepth: 0.75,
+  letterClearance: 0.0379,
+  legClearance: 0.0197,
+  fingerRadius: 0.375,
+};
+for (const [key, inches] of Object.entries(selectedInches)) {
+  assert.ok(
+    Math.abs(defaults[key] - inches * 25.4) < 1e-6,
+    `${key}: selected default`,
+  );
+  assert.ok(
+    Math.abs(module.normalizeLeeStoolParams(defaults)[key] - defaults[key]) <
+      1e-6,
+    `${key}: default remains unchanged by constraints`,
+  );
+}
+assert.equal(
+  model.parameters.find((p) => p.key === "letterClearance").limits.max,
+  3.175,
+);
+assert.equal(
+  model.parameters.find((p) => p.key === "legClearance").limits.max,
+  1.5875,
+);
 function verifyGeometry(g, label) {
   const pos = g.getAttribute("position"),
     edges = new Map();
@@ -100,6 +132,12 @@ function verifyGeometry(g, label) {
 }
 const cases = [
   defaults,
+  {
+    ...defaults,
+    letterClearance: 3.175,
+    legClearance: 1.5875,
+    letterGap: 6.35,
+  },
   ...[127, 152.4].flatMap((legHeight) =>
     [38.1, 50.8].map((legDiameter) => ({
       ...defaults,
@@ -207,5 +245,5 @@ const stlPath = path.join(
 );
 assert.ok(fs.existsSync(stlPath), "registered default STL exists");
 console.log(
-  `Lee Step Stool: ${cases.length} dimension/fit cases, eight closed solids each, source dimensions and pocket/socket separation passed.`,
+  `Lee Step Stool: ${cases.length} dimension/fit cases, eight closed solids each, selected defaults and pocket/socket separation passed.`,
 );
