@@ -138,7 +138,8 @@ export type SupportedViewer =
   | "simple-box-v1"
   | "door-lock-adapter-v1"
   | "dining-table-v1"
-  | "hover-dining-table-v1";
+  | "hover-dining-table-v1"
+  | "lee-step-stool-v1";
 
 export type BaseModelDefinition = {
   id: string;
@@ -195,13 +196,19 @@ export type HoverDiningTableModelDefinition = BaseModelDefinition & {
   geometry: HoverDiningTableGeometry;
 };
 
+export type LeeStepStoolModelDefinition = BaseModelDefinition & {
+  viewer: "lee-step-stool-v1";
+  geometry: { mainAxis: { x: number; y: number; z: number } };
+};
+
 export type ModelDefinition =
   | HolderModelDefinition
   | TrayModelDefinition
   | SimpleBoxModelDefinition
   | DoorLockAdapterModelDefinition
   | DiningTableModelDefinition
-  | HoverDiningTableModelDefinition;
+  | HoverDiningTableModelDefinition
+  | LeeStepStoolModelDefinition;
 
 export type ModelDimensions = {
   length: number;

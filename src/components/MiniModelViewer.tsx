@@ -22,6 +22,7 @@ import {
   getDefaultParams,
   type ModelDefinition,
 } from "../models";
+import { createLeeStoolGeometry } from "../models/leeStepStool";
 import { getWoodSpeciesForModel } from "../woodTexture";
 
 type ThemeMode = "light" | "dark";
@@ -58,6 +59,7 @@ function materialColor(modelKey: string, theme: ThemeMode) {
   if (getWoodSpeciesForModel(modelKey) === "oak") {
     return "#b9824f";
   }
+  if (modelKey === "lee-step-stool") return "#deb78c";
   if (modelKey === "paper-towel-holder") {
     return theme === "dark" ? "#8d97a8" : "#596273";
   }
@@ -157,6 +159,12 @@ function createPreviewObject(
         group.add(new THREE.Mesh(geometry, mainMaterial));
       });
     }
+  } else if (definition.viewer === "lee-step-stool-v1") {
+    sourceGeometry.dispose();
+    group.add(new THREE.Mesh(createLeeStoolGeometry(params), [mainMaterial,
+      new THREE.MeshStandardMaterial({ color: "#ae6741", roughness: 0.7 }),
+      new THREE.MeshStandardMaterial({ color: "#235478", roughness: 0.78 }),
+    ]));
   } else if (definition.viewer === "door-lock-adapter-v1") {
     sourceGeometry.dispose();
     group.add(

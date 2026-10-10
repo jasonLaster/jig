@@ -11,6 +11,7 @@ Production: [jig.jlast.io](https://jig.jlast.io)
 
 The active catalog lives in `public/models/index.json`:
 
+- `lee-step-stool` — Lee Step Stool, with removable LEE letters
 - `dining-table` — Plate Table
 - `whisperer` — Whisperer
 - `vinny-table` — Vinny Table

@@ -1,3 +1,4 @@
+import { getLeeStoolAuditValue, getLeeStoolDimensions, getLeeStoolParameterLimits } from "./leeStepStool";
 import { formatLength } from "../units";
 import {
   getHolderAuditValue,
@@ -95,6 +96,7 @@ export {
   getVinnyTableStructuralAssessment,
 } from "./vinnyTable";
 export type { VinnyCutPart } from "./vinnyTable";
+export { createLeeStoolGeometry } from "./leeStepStool";
 export { getDefaultParams, getParam, getParameter } from "./shared";
 export type {
   AuditItem,
@@ -111,6 +113,7 @@ function getAuditValue(
   unit: LengthUnit,
   model: ModelDefinition,
 ): AuditItem {
+  if (model.viewer === "lee-step-stool-v1") return getLeeStoolAuditValue(check, params, unit);
   if (model.viewer === "door-lock-adapter-v1") {
     return getDoorLockAdapterAuditValue(check, params, unit, model);
   }
@@ -143,6 +146,7 @@ export function getParameterLimits(
   params: ModelParams,
   key: string,
 ): NumberLimits {
+  if (model.viewer === "lee-step-stool-v1") return getLeeStoolParameterLimits(model, params, key);
   if (model.viewer === "door-lock-adapter-v1") {
     return getDoorLockAdapterParameterLimits(model, params, key);
   }
@@ -164,6 +168,7 @@ export function getModelDimensions(
   model: ModelDefinition,
   params: ModelParams,
 ): ModelDimensions {
+  if (model.viewer === "lee-step-stool-v1") return getLeeStoolDimensions(params);
   if (model.viewer === "door-lock-adapter-v1") {
     return getDoorLockAdapterDimensions(params);
   }

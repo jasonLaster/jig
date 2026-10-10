@@ -68,6 +68,8 @@ import {
   HoverBrochurePanel,
   type BrochureGenerationState,
 } from "./components/HoverBrochurePanel";
+import { LeeStoolFabrication } from "./components/LeeStoolFabrication";
+import { createLeeStoolGeometry, normalizeLeeStoolParams } from "./models/leeStepStool";
 import { MiniModelViewer } from "./components/MiniModelViewer";
 import {
   applyHolderMorph,
@@ -261,6 +263,8 @@ const CATALOG_URL = "/models/index.json";
 const DEFAULT_MODEL_ID = "japandi-tray";
 const DEFAULT_LENGTH_UNIT: LengthUnit = "in";
 const PARAM_QUERY_KEYS = [
+  "cornerRadius", "legHeight", "legDiameter", "legInset", "letterHeight", "letterGap",
+  "letterDepth", "letterClearance", "legClearance", "fingerRadius", "edgeRoundover",
   "height",
   "diameter",
   "tubeDiameter",
@@ -695,7 +699,7 @@ function getParamsFromUrl(model: ModelDefinition) {
     : DEFAULT_LENGTH_UNIT;
 
   if (searchParams.get("model") !== model.id) {
-    return params;
+    return model.viewer === "lee-step-stool-v1" ? normalizeLeeStoolParams(params) : params;
   }
 
   if (model.viewer === "hover-dining-table-v1") {
@@ -823,7 +827,7 @@ function getParamsFromUrl(model: ModelDefinition) {
     return synchronizeHoverCrossbarDimensions(model, params);
   }
 
-  return params;
+  return model.viewer === "lee-step-stool-v1" ? normalizeLeeStoolParams(params) : params;
 }
 
 function serializeUrlParam(key: string, valueMm: number, unit: LengthUnit) {
@@ -1234,7 +1238,13 @@ const HolderViewer = forwardRef<
 
     const currentParams = latestParamsRef.current;
     const dimensions = getModelDimensions(model, currentParams);
-    const distance = Math.max(
+    const stoolExploded = model.viewer === "lee-step-stool-v1" && latestAssemblyModeRef.current === "exploded";
+    const stoolHeight = dimensions.height + (stoolExploded ? 85 : 0);
+    const fitFov = Math.min(THREE.MathUtils.degToRad(camera.fov / 2),
+      Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect));
+    const distance = model.viewer === "lee-step-stool-v1"
+      ? Math.hypot(dimensions.length + (stoolExploded ? 24 : 0), dimensions.width + (stoolExploded ? 24 : 0), stoolHeight) / (2 * Math.sin(fitFov)) * 1.12
+      : Math.max(
       dimensions.height * 2.2,
       dimensions.length * 1.55,
       dimensions.width * 2.25,
@@ -1242,7 +1252,8 @@ const HolderViewer = forwardRef<
     const target = new THREE.Vector3(
       0,
       0,
-      model.viewer !== "weighted-paper-towel-holder-v1"
+      model.viewer === "lee-step-stool-v1" ? stoolHeight * 0.5
+        : model.viewer !== "weighted-paper-towel-holder-v1"
         ? dimensions.height * 0.25
         : dimensions.height * 0.42,
     );
@@ -1254,14 +1265,14 @@ const HolderViewer = forwardRef<
       const topDistance =
         model.viewer === "door-lock-adapter-v1"
           ? distance
-          : model.viewer === "dining-table-v1"
+          : (model.viewer === "dining-table-v1" || model.viewer === "lee-step-stool-v1")
             ? distance * 1.05
           : Math.max(distance, dimensions.height * 10);
       camera.position.set(0, 0, target.z + topDistance);
     } else if (preset === "bottom") {
       camera.up.set(0, -1, 0);
       const bottomDistance =
-        model.viewer === "dining-table-v1"
+        (model.viewer === "dining-table-v1" || model.viewer === "lee-step-stool-v1")
           ? distance * 1.05
           : Math.max(distance, dimensions.height * 10);
       camera.position.set(0, 0, target.z - bottomDistance);
@@ -1269,6 +1280,8 @@ const HolderViewer = forwardRef<
       camera.position.set(0, -distance, edgeViewZ);
     } else if (preset === "yEdge") {
       camera.position.set(distance, 0, edgeViewZ);
+    } else if (model.viewer === "lee-step-stool-v1") {
+      camera.position.copy(target).add(new THREE.Vector3(0.7, -1, 0.95).normalize().multiplyScalar(distance));
     } else if (model.viewer !== "weighted-paper-towel-holder-v1") {
       camera.position.set(distance * 0.7, -distance * 0.78, distance * 0.52);
     } else {
@@ -1287,6 +1300,10 @@ const HolderViewer = forwardRef<
   const resetCamera = useCallback(() => {
     setCameraView("iso");
   }, [setCameraView]);
+
+  useEffect(() => {
+    if (model.viewer === "lee-step-stool-v1") resetCamera();
+  }, [assemblyMode, model.viewer, resetCamera]);
 
   const zoomBy = useCallback((scale: number) => {
     const camera = cameraRef.current;
@@ -1371,6 +1388,13 @@ const HolderViewer = forwardRef<
         latestParamsRef.current,
         model,
       );
+    } else if (model.viewer === "lee-step-stool-v1") {
+      mainMesh.geometry.dispose();
+      mainMesh.geometry = createLeeStoolGeometry(latestParamsRef.current, latestAssemblyModeRef.current === "exploded");
+      const dimensions = getModelDimensions(model, latestParamsRef.current);
+      guideMesh.geometry.dispose();
+      guideMesh.geometry = new THREE.BoxGeometry(dimensions.length, dimensions.width, dimensions.height);
+      guideMesh.position.z = dimensions.height / 2;
     } else if (model.viewer === "door-lock-adapter-v1") {
       mainMesh.geometry.dispose();
       mainMesh.geometry = createDoorLockAdapterGeometry(
@@ -1657,7 +1681,9 @@ const HolderViewer = forwardRef<
       latestCoreViewModeRef.current,
       latestRenderModeRef.current,
       model,
-      model.id === "vinny-table" ? [...vinnyMaterialsRef.current.values()] : [],
+      model.id === "vinny-table" ? [...vinnyMaterialsRef.current.values()] :
+        model.viewer === "lee-step-stool-v1" && Array.isArray(mainMesh.material)
+          ? mainMesh.material.slice(1) as THREE.MeshStandardMaterial[] : [],
     );
 
     ghostMesh.visible =
@@ -1689,7 +1715,10 @@ const HolderViewer = forwardRef<
     }
 
     const group = new THREE.Group();
-    const holder = new THREE.Mesh(createCleanExportGeometry(mainMesh.geometry));
+    const exportGeometry = model.viewer === "lee-step-stool-v1"
+      ? createLeeStoolGeometry(latestParamsRef.current) : mainMesh.geometry;
+    const holder = new THREE.Mesh(createCleanExportGeometry(exportGeometry));
+    if (model.viewer === "lee-step-stool-v1") exportGeometry.dispose();
     holder.name = `${model.id}-body`;
     if (model.viewer === "dining-table-v1") {
       orientDiningTableForSupportFreePrint(
@@ -2359,14 +2388,21 @@ const HolderViewer = forwardRef<
           wireframe: true,
         });
 
-        const displayedGeometry = model.viewer === "door-lock-adapter-v1"
+        const displayedGeometry = model.viewer === "lee-step-stool-v1"
+          ? createLeeStoolGeometry(latestParamsRef.current)
+          : model.viewer === "door-lock-adapter-v1"
           ? createDoorLockAdapterGeometry(latestParamsRef.current, model)
           : model.viewer === "dining-table-v1"
             ? createDiningTableWoodGeometry(latestParamsRef.current, model)
             : model.viewer === "hover-dining-table-v1"
               ? createHoverDiningTableGeometry(latestParamsRef.current, model)
             : normalizedMain.geometry;
-        const mainMesh = new THREE.Mesh(displayedGeometry, mainMaterial);
+        const stoolMaterials = model.viewer === "lee-step-stool-v1" ? [
+          mainMaterial,
+          new THREE.MeshStandardMaterial({ color: "#ffffff", map: createWoodTexture(renderer, "cherry"), roughness: 0.7, metalness: 0 }),
+          new THREE.MeshStandardMaterial({ color: "#235478", roughness: 0.78, metalness: 0 }),
+        ] : mainMaterial;
+        const mainMesh = new THREE.Mesh(displayedGeometry, stoolMaterials);
         mainMesh.name = `${model.id}-adjustable-body`;
         mainMesh.castShadow = renderQuality !== "standard";
         mainMesh.receiveShadow = renderQuality !== "standard";
@@ -2490,6 +2526,7 @@ const HolderViewer = forwardRef<
         ghostMeshRef.current = ghostMesh;
 
         if (
+          model.viewer === "lee-step-stool-v1" ||
           model.viewer === "door-lock-adapter-v1" ||
           model.viewer === "dining-table-v1" ||
           model.viewer === "hover-dining-table-v1"
@@ -2787,6 +2824,7 @@ function NumberControl({
   onChange,
   onUnitChange,
   preferFineStep = false,
+  precisionDigits,
 }: {
   label: string;
   valueMm: number;
@@ -2795,12 +2833,15 @@ function NumberControl({
   onChange: (valueMm: number) => void;
   onUnitChange: (unit: LengthUnit) => void;
   preferFineStep?: boolean;
+  precisionDigits?: number;
 }) {
   const id = label.toLowerCase().replace(/\s+/g, "-");
   const unitId = `${id}-unit`;
   const unitOption = UNIT_OPTIONS[unit];
+  const formatInput = (mm: number) => precisionDigits !== undefined && unit !== "in"
+    ? toUnit(mm, unit).toFixed(precisionDigits) : formatLengthInput(mm, unit);
   const [draftValue, setDraftValue] = useState(() =>
-    formatLengthInput(valueMm, unit),
+    formatInput(valueMm),
   );
   const displayValue = Number(toUnit(valueMm, unit).toFixed(4));
   const displayMin = Number(toUnit(limits.min, unit).toFixed(4));
@@ -2821,13 +2862,13 @@ function NumberControl({
     const nextMm = clampValue(
       stepLengthInput(sourceMm, unit, limits.step, direction, preferFineStep),
     );
-    setDraftValue(formatLengthInput(nextMm, unit));
+    setDraftValue(formatInput(nextMm));
     onChange(nextMm);
   };
 
   useEffect(() => {
-    setDraftValue(formatLengthInput(valueMm, unit));
-  }, [unit, valueMm]);
+    setDraftValue(formatInput(valueMm));
+  }, [unit, valueMm, precisionDigits]);
 
   return (
     <div className="number-control">
@@ -2847,7 +2888,7 @@ function NumberControl({
           inputMode={unit === "in" ? "text" : "decimal"}
           type="text"
           value={draftValue}
-          onBlur={() => setDraftValue(formatLengthInput(valueMm, unit))}
+          onBlur={() => setDraftValue(formatInput(valueMm))}
           onChange={(event) => {
             setDraftValue(event.currentTarget.value);
             updateValue(event.currentTarget.value);
@@ -3923,9 +3964,13 @@ function RenderModeControl({
 function RenderQualityControl({
   value,
   onChange,
+  supportsPhoto = true,
+  materialLabel = "oak",
 }: {
   value: RenderQuality;
   onChange: (value: RenderQuality) => void;
+  supportsPhoto?: boolean;
+  materialLabel?: string;
 }) {
   const options = Object.entries(RENDER_QUALITY_LABELS) as Array<
     [RenderQuality, string]
@@ -3935,7 +3980,7 @@ function RenderQualityControl({
     <div className="render-quality-control">
       <span className="workspace-menu-label">Quality</span>
       <div className="segmented-control" aria-label="Rendering quality">
-        {options.map(([option, label]) => (
+        {options.filter(([option]) => supportsPhoto || option !== "photo").map(([option, label]) => (
           <button
             className={value === option ? "active" : ""}
             key={option}
@@ -3948,9 +3993,9 @@ function RenderQualityControl({
       </div>
       <small>
         {value === "standard"
-          ? "Fast procedural oak"
+          ? `Fast procedural ${materialLabel}`
           : value === "high"
-            ? "2K oak PBR and studio lighting"
+            ? (supportsPhoto ? "2K oak PBR and studio lighting" : `${materialLabel} grain and soft shadows`)
             : "Progressive path-traced oak"}
       </small>
     </div>
@@ -5315,6 +5360,8 @@ function WorkspaceActionsMenu({
                 <RenderQualityControl
                   onChange={onRenderQualityChange}
                   value={renderQuality}
+                  supportsPhoto={getWoodSpeciesForModel(model.id) === "oak"}
+                  materialLabel={getWoodSpeciesForModel(model.id) ?? "wood"}
                 />
               ) : null}
               {model.viewer !== "dining-table-v1" &&
@@ -5646,7 +5693,7 @@ export default function App({
         setRenderMode("solid");
         setRenderQuality(
           getWoodSpeciesForModel(nextModel.id)
-            ? getRequestedRenderQuality()
+            ? (nextModel.viewer === "lee-step-stool-v1" && getRequestedRenderQuality() === "photo" ? "high" : getRequestedRenderQuality())
             : "standard",
         );
         brochureRequestRef.current += 1;
@@ -5996,12 +6043,13 @@ export default function App({
         );
       }
       const roundedNextValue = Number(
-        nextValue.toFixed(CURVE_PARAM_KEYS.has(key) ? 3 : 1),
+        nextValue.toFixed(model.viewer === "lee-step-stool-v1" || CURVE_PARAM_KEYS.has(key) ? 3 : 1),
       );
       const next = {
         ...current,
         [key]: clamp(roundedNextValue, limits.min, limits.max),
       };
+      if (model.viewer === "lee-step-stool-v1") return normalizeLeeStoolParams(next);
       const acceptValidHoverParams = (candidate: ModelParams) => {
         if (model.viewer !== "hover-dining-table-v1") return candidate;
         try {
@@ -6256,7 +6304,7 @@ export default function App({
           );
         }
       }
-      setParams(nextParams);
+      setParams(model.viewer === "lee-step-stool-v1" ? normalizeLeeStoolParams(nextParams) : nextParams);
     }
 
     setSelectedModelId(version.modelKey);
@@ -6628,6 +6676,10 @@ export default function App({
               ) : null}
 
               <div className="inspector-body">
+                {model.viewer === "lee-step-stool-v1" ? (
+                  <LeeStoolFabrication params={params} unit={unit} exploded={assemblyMode === "exploded"}
+                    onExplodedChange={(value) => setAssemblyMode(value ? "exploded" : "assembled")} />
+                ) : null}
                 {model.viewer === "hover-dining-table-v1" ? (
                   <section className="panel-section assembly-panel-section">
                     <h2>Assembly</h2>
@@ -6748,6 +6800,7 @@ export default function App({
                         limits={getParameterLimits(model, params, parameter.key)}
                         onChange={(value) => updateParam(parameter.key, value)}
                         onUnitChange={setUnit}
+                        precisionDigits={model.viewer === "lee-step-stool-v1" && parameter.key.endsWith("Clearance") ? 2 : undefined}
                         preferFineStep={parameter.key.endsWith("Clearance")}
                         unit={unit}
                         valueMm={params[parameter.key]}

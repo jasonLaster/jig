@@ -4051,3 +4051,28 @@ html.dark .segmented-control button.active {
     animation-iteration-count: 1 !important;
   }
 }
+
+.lee-stool-cut-list { margin: 16px 0; font-size: 12px; line-height: 1.5; }
+.lee-stool-cut-list dt { margin-top: 10px; font-weight: 600; }
+.lee-stool-cut-list dd { margin: 2px 0 0; color: var(--muted); }
+.lee-stool-exports { display: flex; gap: 6px; flex-wrap: wrap; }
+.lee-stool-exports button { font-size: 11px; }
+
+.lee-stool-fabrication > button, .lee-stool-exports button {
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.lee-stool-fabrication > button:hover, .lee-stool-exports button:hover {
+  border-color: var(--accent);
+}
+.lee-stool-fabrication > button[aria-pressed="true"] {
+  background: var(--accent);
+  color: white;
+}
+.lee-stool-exports button { font-size: 11px; }

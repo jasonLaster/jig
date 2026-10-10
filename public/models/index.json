@@ -25,6 +25,11 @@
       "id": "wave-dining-table",
       "name": "The Wave",
       "configUrl": "/models/wave-dining-table/model.json"
+    },
+    {
+      "id": "lee-step-stool",
+      "name": "Lee Step Stool",
+      "configUrl": "/models/lee-step-stool/model.json"
     }
   ]
 }

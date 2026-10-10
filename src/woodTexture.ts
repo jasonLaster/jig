@@ -8,9 +8,10 @@ export const WOOD_FINISHES = [
   { species: "cherry", label: "Cherry", base: [174, 103, 65] },
 ] as const;
 
-export type WoodSpecies = (typeof WOOD_FINISHES)[number]["species"];
+export type WoodSpecies = (typeof WOOD_FINISHES)[number]["species"] | "sycamore";
 
 const WOOD_SPECIES_BY_MODEL: Readonly<Partial<Record<string, WoodSpecies>>> = {
+  "lee-step-stool": "sycamore",
   "dining-table": "oak",
   whisperer: "oak",
   "vinny-table": "oak",
@@ -34,10 +35,10 @@ export function createWoodTexture(
 
   const image = context.createImageData(canvas.width, canvas.height);
   const walnut = species === "walnut";
-  const base = WOOD_FINISHES.find((finish) => finish.species === species)!.base;
+  const base = species === "sycamore" ? [222, 183, 140] : WOOD_FINISHES.find((finish) => finish.species === species)!.base;
   let seed = walnut ? 0x77616c6e : 0x5f3759df;
   for (let y = 0; y < canvas.height; y += 1) {
-    const grainStrength = species === "maple" ? 0.35 : species === "ash" ? 1.4 : 1;
+    const grainStrength = species === "sycamore" ? 0.55 : species === "maple" ? 0.35 : species === "ash" ? 1.4 : 1;
     const broad = (Math.sin(y * 0.072) * 5 + Math.sin(y * 0.019) * 7) * grainStrength;
     for (let x = 0; x < canvas.width; x += 1) {
       seed = (seed * 1664525 + 1013904223) >>> 0;
