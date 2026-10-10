@@ -6681,7 +6681,7 @@ export default function App({
                     <section className="panel-section lee-stool-layout-controls">
                       <h2>Letter layout</h2>
                       <p className="assembly-mode-note">
-                        Playful rounded letters. Height and width resize all three; the
+                        Clean rounded letters. Height and width resize all three; the
                         horizontal gap is measured between their edges.
                       </p>
                       {["letterHeight", "letterWidth", "letterGap", "letterMargin"].map(

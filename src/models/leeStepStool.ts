@@ -208,51 +208,36 @@ export function getLeeLetterContour(
   const s = getLeeStoolSpec(p),
     w = s.letterWidth,
     h = s.letterHeight;
-  // Broad, pill-rounded serifs follow the second supplied design rather than a block font.
-  const units =
+  // Simple sans-serif strokes with soft corners and a shorter middle E arm.
+  const stroke = Math.min(w * 0.36, h * 0.24);
+  const raw = (
     index === 0
       ? [
           [0, 0],
-          [1, 0],
-          [1, 0.34],
-          [0.75, 0.34],
-          [0.75, 0.24],
-          [0.47, 0.24],
-          [0.47, 0.76],
-          [0.65, 0.76],
-          [0.65, 1],
-          [0, 1],
-          [0, 0.76],
-          [0.16, 0.76],
-          [0.16, 0.24],
-          [0, 0.24],
+          [w, 0],
+          [w, stroke],
+          [stroke, stroke],
+          [stroke, h],
+          [0, h],
         ]
       : [
           [0, 0],
-          [1, 0],
-          [1, 0.34],
-          [0.75, 0.34],
-          [0.75, 0.24],
-          [0.47, 0.24],
-          [0.47, 0.4],
-          [0.7, 0.4],
-          [0.7, 0.6],
-          [0.47, 0.6],
-          [0.47, 0.76],
-          [0.75, 0.76],
-          [0.75, 0.68],
-          [1, 0.68],
-          [1, 1],
-          [0, 1],
-          [0, 0.76],
-          [0.16, 0.76],
-          [0.16, 0.24],
-          [0, 0.24],
-        ];
-  const raw = units.map(([x, y]) => V(x * w, y * h));
+          [w, 0],
+          [w, stroke],
+          [stroke, stroke],
+          [stroke, (h - stroke) / 2],
+          [w * 0.82, (h - stroke) / 2],
+          [w * 0.82, (h + stroke) / 2],
+          [stroke, (h + stroke) / 2],
+          [stroke, h - stroke],
+          [w, h - stroke],
+          [w, h],
+          [0, h],
+        ]
+  ).map(([x, y]) => V(x, y));
   const contour = roundedPolygon(
     offsetOrthogonal(raw, pocket ? s.clearance : 0),
-    h * 0.13,
+    stroke * 0.45,
   );
   if (pocket) {
     // Bottom edge runs from the first rounded corner to the next; splice a semicircle into that straight segment.
