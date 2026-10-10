@@ -41,21 +41,51 @@ export function getLeeStoolSpec(p: ModelParams) {
   );
   const clearance = getParam(p, "letterClearance"),
     fingerRadius = getParam(p, "fingerRadius");
-  const letterGap = Math.max(getParam(p, "letterGap"), clearance * 2 + 3);
-  // Reserve a central rectangle that cannot overlap sockets at any allowed setback.
-  const maxHeight = Math.min(
-    (length -
-      2 * (legInset + legDiameter / 2 + legClearance + 5) -
-      2 * letterGap -
-      2 * clearance) /
-      (3 * 0.68),
-    width -
-      2 * (cornerRadius + edgeRoundover + 5) -
-      fingerRadius -
-      clearance * 2,
+  const minWidth = 31.75,
+    minHeight = 38.1;
+  const letterMargin = Math.min(
+    getParam(p, "letterMargin"),
+    (length - 3 * minWidth - 2 * 6.35 - 2 * clearance) / 2,
+    (width - minHeight - 2 * fingerRadius - 2 * clearance) / 2,
   );
-  const letterHeight = Math.min(getParam(p, "letterHeight"), maxHeight);
-  const letterWidth = letterHeight * 0.68;
+  const centerX = length / 2 - legInset,
+    centerY = width / 2 - legInset;
+  const holeWebRadius = legDiameter / 2 + legClearance + 3.175;
+  const layoutSafe = (w: number, h: number, gap: number) => {
+    const dx = Math.max(0, centerX - (1.5 * w + gap + clearance));
+    const dy = Math.max(0, centerY - (h / 2 + fingerRadius + clearance));
+    return Math.hypot(dx, dy) >= holeWebRadius;
+  };
+  const fit = (low: number, high: number, safe: (n: number) => boolean) => {
+    if (safe(high)) return high;
+    for (let i = 0; i < 36; i++) {
+      const middle = (low + high) / 2;
+      if (safe(middle)) low = middle;
+      else high = middle;
+    }
+    return low;
+  };
+  const gapLimit =
+    (length - 2 * letterMargin - 3 * minWidth - 2 * clearance) / 2;
+  const letterGap = fit(
+    6.35,
+    Math.min(getParam(p, "letterGap"), gapLimit),
+    (gap) => layoutSafe(minWidth, minHeight, gap),
+  );
+  const widthLimit =
+    (length - 2 * letterMargin - 2 * letterGap - 2 * clearance) / 3;
+  const letterWidth = fit(
+    minWidth,
+    Math.min(getParam(p, "letterWidth"), widthLimit),
+    (w) => layoutSafe(w, minHeight, letterGap),
+  );
+  const heightLimit =
+    width - 2 * letterMargin - 2 * fingerRadius - 2 * clearance;
+  const letterHeight = fit(
+    minHeight,
+    Math.min(getParam(p, "letterHeight"), heightLimit),
+    (h) => layoutSafe(letterWidth, h, letterGap),
+  );
   const letterDepth = Math.min(
     getParam(p, "letterDepth"),
     thickness - Math.max(6.35, edgeRoundover + 1),
@@ -75,6 +105,7 @@ export function getLeeStoolSpec(p: ModelParams) {
     clearance,
     fingerRadius,
     letterGap,
+    letterMargin,
     letterHeight,
     letterWidth,
     letterDepth,
@@ -92,6 +123,8 @@ export function normalizeLeeStoolParams(p: ModelParams) {
     legInset: s.legInset,
     edgeRoundover: s.edgeRoundover,
     cornerRadius: s.cornerRadius,
+    letterWidth: s.letterWidth,
+    letterMargin: s.letterMargin,
     letterHeight: s.letterHeight,
     letterGap: s.letterGap,
     letterDepth: s.letterDepth,
@@ -119,18 +152,15 @@ export function getLeeStoolParameterLimits(
     );
     limits.max = Math.min(limits.max, Math.min(s.length, s.width) / 4);
   }
-  if (key === "letterHeight") {
+  if (
+    ["letterHeight", "letterWidth", "letterGap", "letterMargin"].includes(key)
+  ) {
+    const fitted = getLeeStoolSpec({ ...p, [key]: limits.max });
     limits.max = Math.min(
       limits.max,
-      (s.length -
-        2 * (s.legInset + s.legDiameter / 2 + s.legClearance + 5) -
-        2 * s.letterGap -
-        2 * s.clearance) /
-        2.04,
-      s.width -
-        2 * (s.cornerRadius + s.edgeRoundover + 5) -
-        s.fingerRadius -
-        s.clearance * 2,
+      fitted[
+        key as "letterHeight" | "letterWidth" | "letterGap" | "letterMargin"
+      ],
     );
   }
   return limits;
@@ -142,11 +172,11 @@ function roundedPolygon(points: THREE.Vector2[], radius: number) {
   points.forEach((b, i) => {
     const a = points[(i + points.length - 1) % points.length],
       c = points[(i + 1) % points.length];
-    const r = Math.min(radius, a.distanceTo(b) / 3, c.distanceTo(b) / 3);
+    const r = Math.min(radius, a.distanceTo(b) * 0.49, c.distanceTo(b) * 0.49);
     const start = b.clone().add(a.clone().sub(b).normalize().multiplyScalar(r));
     const end = b.clone().add(c.clone().sub(b).normalize().multiplyScalar(r));
-    for (let j = 0; j <= 5; j++) {
-      const t = j / 5;
+    for (let j = 0; j <= 10; j++) {
+      const t = j / 10;
       result.push(
         start
           .clone()
@@ -177,28 +207,52 @@ export function getLeeLetterContour(
 ) {
   const s = getLeeStoolSpec(p),
     w = s.letterWidth,
-    h = s.letterHeight,
-    t = h * 0.29;
-  const raw =
+    h = s.letterHeight;
+  // Broad, pill-rounded serifs follow the second supplied design rather than a block font.
+  const units =
     index === 0
-      ? [V(0, 0), V(w, 0), V(w, t), V(t, t), V(t, h), V(0, h)]
+      ? [
+          [0, 0],
+          [1, 0],
+          [1, 0.34],
+          [0.75, 0.34],
+          [0.75, 0.24],
+          [0.47, 0.24],
+          [0.47, 0.76],
+          [0.65, 0.76],
+          [0.65, 1],
+          [0, 1],
+          [0, 0.76],
+          [0.16, 0.76],
+          [0.16, 0.24],
+          [0, 0.24],
+        ]
       : [
-          V(0, 0),
-          V(w, 0),
-          V(w, t),
-          V(t, t),
-          V(t, (h - t) / 2),
-          V(w * 0.75, (h - t) / 2),
-          V(w * 0.75, (h + t) / 2),
-          V(t, (h + t) / 2),
-          V(t, h - t),
-          V(w, h - t),
-          V(w, h),
-          V(0, h),
+          [0, 0],
+          [1, 0],
+          [1, 0.34],
+          [0.75, 0.34],
+          [0.75, 0.24],
+          [0.47, 0.24],
+          [0.47, 0.4],
+          [0.7, 0.4],
+          [0.7, 0.6],
+          [0.47, 0.6],
+          [0.47, 0.76],
+          [0.75, 0.76],
+          [0.75, 0.68],
+          [1, 0.68],
+          [1, 1],
+          [0, 1],
+          [0, 0.76],
+          [0.16, 0.76],
+          [0.16, 0.24],
+          [0, 0.24],
         ];
+  const raw = units.map(([x, y]) => V(x * w, y * h));
   const contour = roundedPolygon(
     offsetOrthogonal(raw, pocket ? s.clearance : 0),
-    Math.min(3.175, h * 0.04),
+    h * 0.13,
   );
   if (pocket) {
     // Bottom edge runs from the first rounded corner to the next; splice a semicircle into that straight segment.
@@ -211,7 +265,7 @@ export function getLeeLetterContour(
         y + r * Math.sin(Math.PI + (j * Math.PI) / 24),
       ),
     );
-    contour.splice(6, 0, ...arc);
+    contour.splice(11, 0, ...arc);
   }
   return contour.map((v) => v.add(V(s.xs[index] - w / 2, -h / 2)));
 }
@@ -437,6 +491,8 @@ export function createLeeStoolGeometry(p: ModelParams, exploded = false) {
   g.userData = {
     partCount: 8,
     floorThickness: s.floorThickness,
+    letterWidth: s.letterWidth,
+    letterMargin: s.letterMargin,
     letterHeight: s.letterHeight,
   };
   parts.forEach((part) => part.geometry.dispose());

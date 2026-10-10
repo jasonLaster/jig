@@ -4076,3 +4076,16 @@ html.dark .segmented-control button.active {
   color: white;
 }
 .lee-stool-exports button { font-size: 11px; }
+
+.lee-stool-fabrication-details > summary {
+  padding: 16px; cursor: pointer; font-size: 13px; font-weight: 600;
+  border-block: 1px solid var(--border);
+}
+.lee-stool-presets { display: flex; gap: 6px; margin: 6px 0 14px; }
+.lee-stool-presets button {
+  flex: 1; padding: 7px 10px; border: 1px solid var(--border-strong);
+  border-radius: 7px; background: var(--panel); color: var(--foreground);
+  font: inherit; font-size: 12px; cursor: pointer;
+}
+.lee-stool-presets button[aria-pressed="true"] { background: var(--accent); color: var(--accent-foreground); }
+.lee-stool-layout-controls .number-control { margin-top: 14px; }

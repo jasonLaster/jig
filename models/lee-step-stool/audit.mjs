@@ -50,8 +50,8 @@ const defaults = Object.fromEntries(
 assert.equal(defaults.length, 317.5);
 assert.equal(defaults.width, 241.3);
 assert.equal(defaults.topThickness, 38.1);
-assert.equal(defaults.legHeight, 190.5);
-assert.equal(defaults.legDiameter, 25.4);
+assert.equal(defaults.legHeight, 152.4);
+assert.equal(defaults.legDiameter, 38.1);
 assert.equal(defaults.letterDepth, 25.4);
 function verifyGeometry(g, label) {
   const pos = g.getAttribute("position"),
@@ -98,7 +98,16 @@ function verifyGeometry(g, label) {
   assert.ok(volume > 0, `${label}: positive enclosed volume`);
   return volume;
 }
-const cases = [defaults];
+const cases = [
+  defaults,
+  ...[127, 152.4].flatMap((legHeight) =>
+    [38.1, 50.8].map((legDiameter) => ({
+      ...defaults,
+      legHeight,
+      legDiameter,
+    })),
+  ),
+];
 for (const p of model.parameters)
   for (const value of [p.limits.min, p.limits.max])
     cases.push({ ...defaults, [p.key]: value });
@@ -106,6 +115,26 @@ for (const high of [false, true])
   cases.push(
     Object.fromEntries(
       model.parameters.map((p) => [p.key, high ? p.limits.max : p.limits.min]),
+    ),
+  );
+// Mix enlarged legs and inset/spacing extremes on the smallest supported top.
+cases.push({
+  ...Object.fromEntries(model.parameters.map((p) => [p.key, p.limits.max])),
+  length: 279.4,
+  width: 215.9,
+});
+let seed = 20261010;
+for (let sample = 0; sample < 16; sample++)
+  cases.push(
+    Object.fromEntries(
+      model.parameters.map((parameter) => {
+        seed = (1664525 * seed + 1013904223) >>> 0;
+        return [
+          parameter.key,
+          parameter.limits.min +
+            ((parameter.limits.max - parameter.limits.min) * seed) / 0xffffffff,
+        ];
+      }),
     ),
   );
 for (const [caseIndex, p] of cases.entries()) {
@@ -136,13 +165,24 @@ for (const [caseIndex, p] of cases.entries()) {
     assert.ok(b.maxY < s.width / 2 - s.edgeRoundover);
     if (i > 0) assert.ok(b.minX > bounds[i - 1].maxX);
   });
-  for (const b of bounds)
-    assert.ok(
-      b.minX >
-        -s.length / 2 + s.legInset + s.legDiameter / 2 + s.legClearance &&
-        b.maxX < s.length / 2 - s.legInset - s.legDiameter / 2 - s.legClearance,
-      "letters clear sockets",
-    );
+  for (const b of bounds) {
+    assert.ok(b.minX >= -s.length / 2 + s.letterMargin - 1e-6);
+    assert.ok(b.maxX <= s.length / 2 - s.letterMargin + 1e-6);
+    assert.ok(b.minY >= -s.width / 2 + s.letterMargin - 1e-6);
+    assert.ok(b.maxY <= s.width / 2 - s.letterMargin + 1e-6);
+    for (const x of [-1, 1])
+      for (const y of [-1, 1]) {
+        const cx = x * (s.length / 2 - s.legInset),
+          cy = y * (s.width / 2 - s.legInset);
+        const dx = Math.max(b.minX - cx, 0, cx - b.maxX),
+          dy = Math.max(b.minY - cy, 0, cy - b.maxY);
+        assert.ok(
+          Math.hypot(dx, dy) >=
+            s.legDiameter / 2 + s.legClearance + 3.175 - 1e-6,
+          "letter pockets leave positive wood between corner sockets",
+        );
+      }
+  }
 }
 {
   const parts = module.createLeeStoolParts(defaults),

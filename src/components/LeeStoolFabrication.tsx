@@ -69,7 +69,8 @@ export function LeeStoolFabrication({
         </dd>
         <dt>Letters · 3</dt>
         <dd>
-          {f(s.letterHeight)} tall × {f(s.letterDepth)} thick
+          {f(s.letterHeight)} tall × {f(s.letterWidth)} wide ×{" "}
+          {f(s.letterDepth)} thick
         </dd>
         <dt>Pocket floor</dt>
         <dd>{f(s.floorThickness)} remaining</dd>
@@ -105,8 +106,8 @@ export function LeeStoolFabrication({
         ))}
       </div>
       <p className="assembly-mode-note">
-        Default: 12½″ × 9½″ top and 7½″ exposed legs. Letter layout, roundovers
-        and fit are inferred from the illustration. No load rating is
+        Default: 12½″ × 9½″ top, 6″ leg clearance and 1½″ legs. Letter layout,
+        roundovers and fit are inferred from the illustration. No load rating is
         established.
       </p>
     </section>

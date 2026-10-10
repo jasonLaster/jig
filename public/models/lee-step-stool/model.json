@@ -2,7 +2,7 @@
   "id": "lee-step-stool",
   "name": "Lee Step Stool",
   "subtitle": "Sycamore, cherry & a little blue",
-  "description": "A reference-matched 12\u00bd \u00d7 9\u00bd inch stool with a rounded sycamore top, four flush through cherry legs and three removable blue LEE letters. Dimensions in the design sheet set the defaults; fit and undimensioned details remain editable.",
+  "description": "A rounded sycamore stool with four flush through cherry legs and playful removable blue LEE letters. Letter height, width, horizontal gaps, wood border and fit are independently editable. Revised defaults use 6-inch leg clearance and 1½-inch legs.",
   "viewer": "lee-step-stool-v1",
   "stl": {
     "fileName": "lee-step-stool.stl",
@@ -53,31 +53,31 @@
     },
     {
       "key": "legHeight",
-      "label": "Exposed leg height",
-      "default": 190.5,
+      "label": "Leg clearance",
+      "default": 152.4,
       "limits": {
-        "min": 177.8,
+        "min": 101.6,
         "max": 203.2,
-        "step": 3.175
+        "step": 6.35
       }
     },
     {
       "key": "legDiameter",
       "label": "Leg diameter",
-      "default": 25.4,
+      "default": 38.1,
       "limits": {
         "min": 25.4,
-        "max": 31.75,
-        "step": 1.5875
+        "max": 50.8,
+        "step": 3.175
       }
     },
     {
       "key": "legInset",
       "label": "Leg center setback",
-      "default": 27.55,
+      "default": 33.9,
       "limits": {
         "min": 25.4,
-        "max": 38.1,
+        "max": 63.5,
         "step": 1
       }
     },
@@ -104,20 +104,40 @@
     {
       "key": "letterHeight",
       "label": "Letter height",
-      "default": 88.9,
+      "default": 82.55,
       "limits": {
-        "min": 50.8,
-        "max": 114.3,
+        "min": 38.1,
+        "max": 127,
+        "step": 3.175
+      }
+    },
+    {
+      "key": "letterMargin",
+      "label": "Minimum wood border",
+      "default": 38.1,
+      "limits": {
+        "min": 12.7,
+        "max": 63.5,
+        "step": 3.175
+      }
+    },
+    {
+      "key": "letterWidth",
+      "label": "Letter width",
+      "default": 50.8,
+      "limits": {
+        "min": 31.75,
+        "max": 88.9,
         "step": 3.175
       }
     },
     {
       "key": "letterGap",
-      "label": "Letter spacing",
-      "default": 19.05,
+      "label": "Horizontal letter gap",
+      "default": 25.4,
       "limits": {
-        "min": 12.7,
-        "max": 25.4,
+        "min": 6.35,
+        "max": 50.8,
         "step": 1.5875
       }
     },
@@ -134,7 +154,7 @@
     {
       "key": "letterClearance",
       "label": "Letter clearance per side",
-      "default": 0.35,
+      "default": 0.8,
       "limits": {
         "min": 0.15,
         "max": 1,
@@ -165,7 +185,7 @@
   "audit": {
     "toleranceMm": 0.05,
     "dimensionTargets": [
-      "Top 12.5 \u00d7 9.5 \u00d7 1.5 inches; 1-inch leg diameter; 7.5-inch exposed legs.",
+      "Top 12.5 × 9.5 × 1.5 inches; revised default 1.5-inch leg diameter and 6-inch floor-to-underside clearance. Leg diameter adjusts through 2 inches and clearance includes 5 and 6 inches.",
       "Approximately 1-inch-deep letters with a positive blind pocket floor."
     ],
     "invariants": [

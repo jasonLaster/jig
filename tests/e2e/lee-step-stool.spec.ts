@@ -44,9 +44,10 @@ test("opens Lee from library, shows source dimensions and real colored geometry"
     page.getByLabel("Top thickness in inches", { exact: true }),
   ).toHaveValue("1 1/2");
   await expect(
-    page.getByLabel("Exposed leg height in inches", { exact: true }),
-  ).toHaveValue("7 1/2");
+    page.getByLabel("Leg clearance in inches", { exact: true }),
+  ).toHaveValue("6");
   await page.screenshot({ path: ".playwright/lee-stool-assembled.png" });
+  await page.getByText("Assembly & exports", { exact: true }).click();
   await page
     .getByRole("button", { name: "Lift letters & separate legs" })
     .click();
@@ -75,6 +76,7 @@ test("couples pocket depth to floor stock and downloads actual parts and full-si
   await expect(
     page.getByLabel("Letter and pocket depth in millimeters", { exact: true }),
   ).toHaveValue("25.4");
+  await page.getByText("Assembly & exports", { exact: true }).click();
   await page
     .getByRole("button", { name: "Lift letters & separate legs" })
     .click();
@@ -105,7 +107,7 @@ test("couples pocket depth to floor stock and downloads actual parts and full-si
   const assembled = await assembledDownload;
   const assembledFile = testInfo.outputPath("assembled.stl");
   await assembled.saveAs(assembledFile);
-  await checkStl(assembledFile, 222.25);
+  await checkStl(assembledFile, 184.15);
 });
 
 test("renders on a narrow screen", async ({ page }) => {
@@ -130,7 +132,7 @@ test("keeps fine fit clearances and furniture rendering controls", async ({
     "Letter clearance per side in millimeters",
     { exact: true },
   );
-  await expect(clearance).toHaveValue("0.35");
+  await expect(clearance).toHaveValue("0.80");
   await clearance.fill("0.45");
   await clearance.blur();
   await expect(page).toHaveURL(/letterClearance=0.45(&|$)/);
@@ -145,4 +147,60 @@ test("keeps fine fit clearances and furniture rendering controls", async ({
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Wire", exact: true }).click();
   await expect(page.getByTestId("viewer-status")).toContainText("Wire");
+});
+
+test("edits rounded letter layout independently and uses shorter thicker leg presets", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.text().includes("Ignored an invalid model"))
+      errors.push(message.text());
+  });
+  await page.goto("/?model=lee-step-stool&unit=in&quality=standard");
+  const height = page.getByLabel("Letter height in inches", { exact: true });
+  const width = page.getByLabel("Letter width in inches", { exact: true });
+  const gap = page.getByLabel("Horizontal letter gap in inches", {
+    exact: true,
+  });
+  await expect(height).toHaveValue("3 1/4");
+  await expect(width).toHaveValue("2");
+  await expect(gap).toHaveValue("1");
+  await expect(height).toBeInViewport();
+  await expect(gap).toBeInViewport();
+  await height.fill("3");
+  await height.blur();
+  await width.fill("2.25");
+  await width.blur();
+  await gap.fill("0.75");
+  await gap.blur();
+  await expect(height).toHaveValue("3");
+  await expect(width).toHaveValue("2 1/4");
+  await expect(gap).toHaveValue("3/4");
+  await page
+    .getByRole("group", { name: "Leg clearance presets" })
+    .getByRole("button", { name: "5″", exact: true })
+    .click();
+  await page
+    .getByRole("group", { name: "Leg diameter presets" })
+    .getByRole("button", { name: "2″", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Leg clearance in inches", { exact: true }),
+  ).toHaveValue("5");
+  await expect(
+    page.getByLabel("Leg diameter in inches", { exact: true }),
+  ).toHaveValue("2");
+  await expect(height).toHaveValue("3");
+  await expect(width).toHaveValue("2 1/4");
+  await page.reload();
+  await expect(
+    page.getByLabel("Leg diameter in inches", { exact: true }),
+  ).toHaveValue("2");
+  await expect(gap).toHaveValue("3/4");
+  await page.screenshot({
+    path: ".playwright/lee-stool-rounded-short-legs.png",
+  });
+  expect(errors).toEqual([]);
 });

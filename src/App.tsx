@@ -263,7 +263,7 @@ const CATALOG_URL = "/models/index.json";
 const DEFAULT_MODEL_ID = "japandi-tray";
 const DEFAULT_LENGTH_UNIT: LengthUnit = "in";
 const PARAM_QUERY_KEYS = [
-  "cornerRadius", "legHeight", "legDiameter", "legInset", "letterHeight", "letterGap",
+  "letterWidth", "letterMargin", "cornerRadius", "legHeight", "legDiameter", "legInset", "letterHeight", "letterGap",
   "letterDepth", "letterClearance", "legClearance", "fingerRadius", "edgeRoundover",
   "height",
   "diameter",
@@ -2400,7 +2400,7 @@ const HolderViewer = forwardRef<
         const stoolMaterials = model.viewer === "lee-step-stool-v1" ? [
           mainMaterial,
           new THREE.MeshStandardMaterial({ color: "#ffffff", map: createWoodTexture(renderer, "cherry"), roughness: 0.7, metalness: 0 }),
-          new THREE.MeshStandardMaterial({ color: "#235478", roughness: 0.78, metalness: 0 }),
+          new THREE.MeshStandardMaterial({ color: "#376e9e", map: createWoodTexture(renderer, "maple"), roughness: 0.78, metalness: 0 }),
         ] : mainMaterial;
         const mainMesh = new THREE.Mesh(displayedGeometry, stoolMaterials);
         mainMesh.name = `${model.id}-adjustable-body`;
@@ -6677,8 +6677,87 @@ export default function App({
 
               <div className="inspector-body">
                 {model.viewer === "lee-step-stool-v1" ? (
-                  <LeeStoolFabrication params={params} unit={unit} exploded={assemblyMode === "exploded"}
-                    onExplodedChange={(value) => setAssemblyMode(value ? "exploded" : "assembled")} />
+                  <>
+                    <section className="panel-section lee-stool-layout-controls">
+                      <h2>Letter layout</h2>
+                      <p className="assembly-mode-note">
+                        Playful rounded letters. Height and width resize all three; the
+                        horizontal gap is measured between their edges.
+                      </p>
+                      {["letterHeight", "letterWidth", "letterGap", "letterMargin"].map(
+                        (key) => {
+                          const parameter = model.parameters.find((p) => p.key === key)!;
+                          return (
+                            <NumberControl
+                              key={key}
+                              label={parameter.label}
+                              valueMm={params[key]}
+                              unit={unit}
+                              limits={getParameterLimits(model, params, key)}
+                              onUnitChange={setUnit}
+                              onChange={(value) => updateParam(key, value)}
+                            />
+                          );
+                        },
+                      )}
+                    </section>
+                    <section className="panel-section lee-stool-leg-controls">
+                      <h2>Legs</h2>
+                      <p className="assembly-mode-note">
+                        Clearance is the floor-to-underside height.
+                      </p>
+                      {["legHeight", "legDiameter"].map((key) => {
+                        const parameter = model.parameters.find((p) => p.key === key)!;
+                        return (
+                          <div key={key}>
+                            <NumberControl
+                              label={parameter.label}
+                              valueMm={params[key]}
+                              unit={unit}
+                              limits={getParameterLimits(model, params, key)}
+                              onUnitChange={setUnit}
+                              onChange={(value) => updateParam(key, value)}
+                            />
+                            <div
+                              className="lee-stool-presets"
+                              role="group"
+                              aria-label={
+                                key === "legHeight"
+                                  ? "Leg clearance presets"
+                                  : "Leg diameter presets"
+                              }
+                            >
+                              {(key === "legHeight" ? [5, 6, 7.5] : [1, 1.5, 2]).map(
+                                (inches) => (
+                                  <button
+                                    key={inches}
+                                    type="button"
+                                    aria-pressed={
+                                      Math.abs(params[key] - inches * 25.4) < 0.02
+                                    }
+                                    onClick={() => updateParam(key, inches * 25.4)}
+                                  >
+                                    {inches}″
+                                  </button>
+                                ),
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </section>
+                    <details className="lee-stool-fabrication-details">
+                      <summary>Assembly & exports</summary>
+                      <LeeStoolFabrication
+                        params={params}
+                        unit={unit}
+                        exploded={assemblyMode === "exploded"}
+                        onExplodedChange={(value) =>
+                          setAssemblyMode(value ? "exploded" : "assembled")
+                        }
+                      />
+                    </details>
+                  </>
                 ) : null}
                 {model.viewer === "hover-dining-table-v1" ? (
                   <section className="panel-section assembly-panel-section">
@@ -6712,7 +6791,7 @@ export default function App({
                   <h2>
                     {model.viewer === "hover-dining-table-v1"
                       ? "Model controls"
-                      : "Parameters"}
+                      : model.viewer === "lee-step-stool-v1" ? "Top & fit" : "Parameters"}
                   </h2>
                   {model.viewer === "dining-table-v1" ? (
                     <>
@@ -6769,6 +6848,7 @@ export default function App({
                     />
                   ) : model.parameters
                     .filter((parameter) => {
+                      if (model.viewer === "lee-step-stool-v1" && ["letterHeight", "letterWidth", "letterGap", "letterMargin", "legHeight", "legDiameter"].includes(parameter.key)) return false;
                       if (
                         model.viewer === "dining-table-v1" &&
                         Number.isFinite(params.legGrooveEnabled) &&
