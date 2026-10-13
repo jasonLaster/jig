@@ -35,3 +35,12 @@ Verification views: assembled top oblique for color and letters; top for three o
 Independent letter-top and pocket-rim roundovers default to 1/16 inch. Straight letter/pocket walls retain the fit clearance; only the upper profiles shrink or open. The well has tangent entry curves to keep its rim continuous. Small strokes, tight E notches, narrow letter bottoms and socket proximity constrain effective radii and layout. The SVG distinguishes straight pocket walls, dashed amber rim mouths, and blue insert outlines. See [fit and thumb-access guidance](lee-step-stool-fit.md) for proposed workshop starting points.
 
 The inspector begins with Letter layout: height, width, horizontal gap and minimum wood border. The Legs section follows with clearance/diameter sliders and 5, 6, 7.5-inch clearance presets plus 1, 1.5, 2-inch diameter presets. Edges & thumb access follows the legs, with independent roundover controls, fit clearance, well radius and child/shared/roomy presets. Assembly and exports are in an expandable section; detailed top/fit settings follow. Info icons use the shadcn/ui Radix tooltip composition, with descriptions available on hover and keyboard focus. Pocket fit clearance remains distinct from the wood border. Geometry, assembled/exploded previews, registered and individual STLs, and the SVG all use the same rounded sans-serif letter contours and effective dimensions.
+
+
+## Upper-lamination CNC export
+
+The dedicated upper-lamination STL contains the upper half of the top alone, with thickness derived as half the finished top thickness. The bottom is a flat glue face at Z = 0, with centered XY coordinates and millimeter geometry. It shares the top-edge and pocket-rim roundovers, plan corners, sockets, finger wells and effective fit dimensions with the assembled model.
+
+At the selected 13 × 9 × 1.5-inch top and 0.75-inch pocket depth, the exported layer is 13 × 9 × 0.75 inches. Letters/finger wells and the four leg sockets are through-cuts in the upper layer. The lower layer provides the 0.75-inch pocket floor and requires matching leg sockets. If pocket depth is shallower than half the top thickness, the upper layer retains a blind floor. If deeper, the export contains through-pockets and the inspector reports the additional depth needed in the lower layer.
+
+This STL describes the finished upper part for CAM. Cutter selection, allowances, tabs, cut-through overshoot, workholding, stock origin and toolpaths are set in the CAM job. The glue face has no underside roundover.

@@ -477,7 +477,23 @@ function wall(
     );
   });
 }
+export function getLeeStoolLaminationSpec(p: ModelParams) {
+  const s = getLeeStoolSpec(p);
+  const thickness = s.thickness / 2;
+  return {
+    thickness,
+    pocketDepth: Math.min(s.letterDepth, thickness),
+    throughPockets: s.letterDepth >= thickness - 1e-6,
+    lowerPocketDepth: Math.max(0, s.letterDepth - thickness),
+  };
+}
 export function createLeeStoolTop(p: ModelParams) {
+  return createLeeTopGeometry(p, false);
+}
+export function createLeeStoolUpperLamination(p: ModelParams) {
+  return createLeeTopGeometry(p, true);
+}
+function createLeeTopGeometry(p: ModelParams, upperLamination: boolean) {
   const s = getLeeStoolSpec(p),
     positions: number[] = [];
   const legHoles = [-1, 1].flatMap((x) =>
@@ -491,7 +507,20 @@ export function createLeeStoolTop(p: ModelParams) {
   );
   const pockets = [0, 1, 2].map((i) => getLeeLetterContour(p, i, true));
   const edge = s.edgeRoundover;
-  cap(outer(p, edge), legHoles, s.legHeight, false, positions);
+  const bottomZ = upperLamination
+    ? s.overallHeight - s.thickness / 2
+    : s.legHeight;
+  const throughPockets =
+    upperLamination && getLeeStoolLaminationSpec(p).throughPockets;
+  cap(
+    upperLamination ? outer(p) : outer(p, edge),
+    throughPockets
+      ? [...legHoles, ...pockets.map((c) => c.slice().reverse())]
+      : legHoles,
+    bottomZ,
+    false,
+    positions,
+  );
   cap(
     outer(p, edge),
     [
@@ -502,11 +531,17 @@ export function createLeeStoolTop(p: ModelParams) {
     true,
     positions,
   );
-  legHoles.forEach((h) => wall(h, h, s.legHeight, s.overallHeight, positions));
+  legHoles.forEach((h) => wall(h, h, bottomZ, s.overallHeight, positions));
   pockets.forEach((c) => {
-    cap(c, [], s.floorZ, true, positions);
+    if (!throughPockets) cap(c, [], s.floorZ, true, positions);
     const h = c.slice().reverse();
-    wall(h, h, s.floorZ, s.overallHeight - s.pocketRoundover, positions);
+    wall(
+      h,
+      h,
+      throughPockets ? bottomZ : s.floorZ,
+      s.overallHeight - s.pocketRoundover,
+      positions,
+    );
     if (s.pocketRoundover > 0) {
       for (let j = 0; j < 8; j++) {
         const a = (j * Math.PI) / 16,
@@ -526,13 +561,14 @@ export function createLeeStoolTop(p: ModelParams) {
   for (let j = 0; j < 5; j++) {
     const a = (j * Math.PI) / 10,
       b = ((j + 1) * Math.PI) / 10;
-    wall(
-      outer(p, edge * (1 - Math.sin(a))),
-      outer(p, edge * (1 - Math.sin(b))),
-      s.legHeight + edge * (1 - Math.cos(a)),
-      s.legHeight + edge * (1 - Math.cos(b)),
-      positions,
-    );
+    if (!upperLamination)
+      wall(
+        outer(p, edge * (1 - Math.sin(a))),
+        outer(p, edge * (1 - Math.sin(b))),
+        s.legHeight + edge * (1 - Math.cos(a)),
+        s.legHeight + edge * (1 - Math.cos(b)),
+        positions,
+      );
     wall(
       outer(p, edge * (1 - Math.cos(a))),
       outer(p, edge * (1 - Math.cos(b))),
@@ -544,10 +580,13 @@ export function createLeeStoolTop(p: ModelParams) {
   wall(
     outer(p),
     outer(p),
-    s.legHeight + edge,
+    upperLamination ? bottomZ : s.legHeight + edge,
     s.overallHeight - edge,
     positions,
   );
+  if (upperLamination) {
+    for (let i = 2; i < positions.length; i += 3) positions[i] -= bottomZ;
+  }
   return geometryFromPositions(positions);
 }
 export function createLeeStoolParts(p: ModelParams): StoolPart[] {

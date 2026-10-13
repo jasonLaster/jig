@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import {
   createLeeStoolParts,
+  createLeeStoolUpperLamination,
+  getLeeStoolLaminationSpec,
   createLeeStoolTemplate,
   getLeeStoolSpec,
 } from "../models/leeStepStool";
@@ -26,6 +28,7 @@ export function LeeStoolFabrication({
   exploded: boolean;
   onExplodedChange: (value: boolean) => void;
 }) {
+  const lamination = getLeeStoolLaminationSpec(params);
   const s = getLeeStoolSpec(params),
     f = (n: number) => formatLength(n, unit);
   const exportPart = (index: number) => {
@@ -43,6 +46,17 @@ export function LeeStoolFabrication({
       `lee-step-stool-${part.name}.stl`,
     );
     parts.forEach((p) => p.geometry.dispose());
+  };
+  const exportCncLamination = () => {
+    const geometry = createLeeStoolUpperLamination(params);
+    const bytes = new STLExporter().parse(new THREE.Mesh(geometry), {
+      binary: true,
+    });
+    download(
+      new Blob([bytes], { type: "model/stl" }),
+      "lee-step-stool-top-upper-lamination-cnc.stl",
+    );
+    geometry.dispose();
   };
   return (
     <section className="panel-section assembly-panel-section lee-stool-fabrication">
@@ -103,6 +117,31 @@ export function LeeStoolFabrication({
         test with your finish. Black lines mark the straight pocket walls;
         dashed amber lines show the rounded mouths; blue lines mark the letters.
       </p>
+      <div className="lee-stool-cnc-export">
+        <h3>Upper lamination · CNC</h3>
+        <p className="assembly-mode-note">
+          {f(s.length)} × {f(s.width)} × {f(lamination.thickness)} stock.
+          {lamination.throughPockets
+            ? " Letter pockets and leg sockets cut through this layer."
+            : ` Letter pockets are ${f(lamination.pocketDepth)} deep; leg sockets cut through.`}
+          {lamination.lowerPocketDepth > 1e-6
+            ? ` The lower layer also needs ${f(lamination.lowerPocketDepth)} of pocket depth beneath the letters.`
+            : " The lower layer supplies the remaining pocket floor."}
+        </p>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={exportCncLamination}
+        >
+          Export upper lamination CNC STL
+        </button>
+        <p className="assembly-mode-note">
+          Includes top-edge and pocket-rim roundovers, a flat glue face, and the
+          current fit clearances. Millimeter geometry with the bottom at Z = 0;
+          choose stock setup and toolpaths in CAM. Cut matching leg sockets in
+          the lower layer.
+        </p>
+      </div>
       <div className="lee-stool-exports">
         {["Top", "Leg", "Letter L", "First E", "Second E"].map((label, i) => (
           <button

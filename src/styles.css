@@ -4120,7 +4120,7 @@ html.dark .segmented-control button.active {
 .lee-stool-exports { display: flex; gap: 6px; flex-wrap: wrap; }
 .lee-stool-exports button { font-size: 11px; }
 
-.lee-stool-fabrication > button, .lee-stool-exports button {
+.lee-stool-fabrication > button, .lee-stool-exports button, .lee-stool-cnc-export > button {
   padding: 8px 10px;
   border: 1px solid var(--border-strong);
   border-radius: 7px;
@@ -4130,7 +4130,7 @@ html.dark .segmented-control button.active {
   font-size: 12px;
   cursor: pointer;
 }
-.lee-stool-fabrication > button:hover, .lee-stool-exports button:hover {
+.lee-stool-fabrication > button:hover, .lee-stool-exports button:hover, .lee-stool-cnc-export > button:hover {
   border-color: var(--accent);
 }
 .lee-stool-fabrication > button[aria-pressed="true"] {
@@ -4155,3 +4155,14 @@ html.dark .segmented-control button.active {
 .lee-stool-access-controls .number-control { margin-top: 14px; }
 
 .lee-stool-presets button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.lee-stool-cnc-export {
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+}
+.lee-stool-cnc-export h3 { margin: 0; font-size: 13px; }
+.lee-stool-cnc-export .assembly-mode-note { margin: 10px 0; }
+.lee-stool-cnc-export .assembly-mode-note:last-child { margin-bottom: 0; }

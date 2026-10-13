@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
-import { Mesh, Group } from "three";
+import { Mesh, Group, Raycaster, Vector3 } from "three";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 const root = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -180,6 +180,51 @@ for (let sample = 0; sample < 64; sample++)
 for (const [caseIndex, p] of cases.entries()) {
   const s = module.getLeeStoolSpec(p),
     parts = module.createLeeStoolParts(p);
+  const upper = module.createLeeStoolUpperLamination(p);
+  verifyGeometry(upper, `case ${caseIndex} CNC upper lamination`);
+  upper.computeBoundingBox();
+  const box = upper.boundingBox;
+  assert.ok(Math.abs(box.min.z) < 1e-6, "CNC stock bottom at Z=0");
+  assert.ok(
+    Math.abs(box.max.z - s.thickness / 2) < 1e-4,
+    "CNC stock is half thickness",
+  );
+  assert.ok(Math.abs(box.max.x - box.min.x - s.length) < 1e-4);
+  assert.ok(Math.abs(box.max.y - box.min.y - s.width) < 1e-4);
+  const upperMesh = new Mesh(upper);
+  const ray = new Raycaster(
+    new Vector3(s.xs[0] - s.letterWidth / 2 + 3, 0, s.thickness),
+    new Vector3(0, 0, -1),
+  );
+  const pocketHits = ray.intersectObject(upperMesh);
+  const laminate = module.getLeeStoolLaminationSpec(p);
+  assert.equal(
+    pocketHits.length,
+    laminate.throughPockets ? 0 : 1,
+    "CNC layer has through cuts or an actual blind floor",
+  );
+  if (pocketHits.length)
+    assert.ok(
+      Math.abs(pocketHits[0].point.z - (laminate.thickness - s.letterDepth)) <
+        1e-4,
+    );
+  for (const x of [-1, 1])
+    for (const y of [-1, 1]) {
+      ray.set(
+        new Vector3(
+          x * (s.length / 2 - s.legInset),
+          y * (s.width / 2 - s.legInset),
+          s.thickness,
+        ),
+        new Vector3(0, 0, -1),
+      );
+      assert.equal(
+        ray.intersectObject(upperMesh).length,
+        0,
+        "CNC socket remains open with no leg solid",
+      );
+    }
+  upper.dispose();
   assert.equal(parts.length, 8);
   assert.ok(s.floorThickness >= 6.35 - 1e-6);
   const topVolume = verifyGeometry(parts[0].geometry, `case ${caseIndex} top`);
@@ -301,11 +346,26 @@ for (const [key, index] of [
   );
   parts.forEach((part) => part.geometry.dispose());
 }
+{
+  const geometry = module.createLeeStoolUpperLamination(defaults);
+  const bytes = new STLExporter().parse(new Mesh(geometry), { binary: true });
+  const output = path.join(
+    root,
+    "public/models/lee-step-stool/lee-step-stool-top-upper-lamination-cnc.stl",
+  );
+  const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (process.argv.includes("--write-stl")) fs.writeFileSync(output, buffer);
+  assert.ok(
+    fs.readFileSync(output).equals(buffer),
+    "default CNC STL matches the upper-lamination geometry",
+  );
+  geometry.dispose();
+}
 const stlPath = path.join(
   root,
   "public/models/lee-step-stool/lee-step-stool.stl",
 );
 assert.ok(fs.existsSync(stlPath), "registered default STL exists");
 console.log(
-  `Lee Step Stool: ${cases.length} dimension/fit cases, eight closed solids each, selected defaults and pocket/socket separation passed.`,
+  `Lee Step Stool: ${cases.length} dimension/fit cases, eight closed assembly solids plus a closed CNC upper lamination each, selected defaults and pocket/socket separation passed.`,
 );

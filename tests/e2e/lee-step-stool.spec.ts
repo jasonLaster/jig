@@ -345,3 +345,56 @@ test("keeps independent upper roundovers, thumb presets and actual export profil
   ).toBeVisible();
   await expect(page).not.toHaveURL(/(?:letterRoundover|pocketRoundover)=/);
 });
+
+test("exports the half-thickness CNC upper lamination with through cuts or a blind floor", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/?model=lee-step-stool&unit=in&quality=standard");
+  await page.getByText("Assembly & exports", { exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Upper lamination · CNC" }),
+  ).toBeVisible();
+  const cnc = page.locator(".lee-stool-cnc-export");
+  await expect(cnc).toContainText("13 in × 9 in × 3/4 in stock");
+  await expect(cnc).toContainText(
+    "Letter pockets and leg sockets cut through this layer",
+  );
+  await page
+    .getByRole("button", { name: "Lift letters & separate legs" })
+    .click();
+  const download = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export upper lamination CNC STL" })
+    .click();
+  const stl = await download;
+  expect(stl.suggestedFilename()).toBe(
+    "lee-step-stool-top-upper-lamination-cnc.stl",
+  );
+  const file = testInfo.outputPath("upper-lamination.stl");
+  await stl.saveAs(file);
+  await checkStl(file, 19.05);
+  expect(await fs.readFile(file)).toEqual(
+    await fs.readFile(
+      "public/models/lee-step-stool/lee-step-stool-top-upper-lamination-cnc.stl",
+    ),
+  );
+  await cnc.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: ".playwright/lee-stool-cnc-export.png" });
+  await page.getByRole("button", { name: "Assemble stool" }).click();
+  await page
+    .getByLabel("Letter and pocket depth in inches", { exact: true })
+    .fill("0.5");
+  await page
+    .getByLabel("Letter and pocket depth in inches", { exact: true })
+    .blur();
+  await expect(cnc).toContainText("Letter pockets are 1/2 in deep");
+  await page
+    .getByLabel("Letter and pocket depth in inches", { exact: true })
+    .fill("1");
+  await page
+    .getByLabel("Letter and pocket depth in inches", { exact: true })
+    .blur();
+  await expect(cnc).toContainText(
+    "lower layer also needs 1/4 in of pocket depth",
+  );
+});
