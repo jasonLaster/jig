@@ -356,8 +356,9 @@ test("exports the half-thickness CNC upper lamination with through cuts or a bli
   ).toBeVisible();
   const cnc = page.locator(".lee-stool-cnc-export");
   await expect(cnc).toContainText("13 in × 9 in × 3/4 in stock");
+  await expect(cnc).toContainText("Drill the leg sockets after lamination");
   await expect(cnc).toContainText(
-    "Letter pockets and leg sockets cut through this layer",
+    "Letter pockets and finger wells cut through this layer",
   );
   await page
     .getByRole("button", { name: "Lift letters & separate legs" })

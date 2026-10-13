@@ -218,10 +218,15 @@ for (const [caseIndex, p] of cases.entries()) {
         ),
         new Vector3(0, 0, -1),
       );
+      const legSiteHits = ray.intersectObject(upperMesh);
       assert.equal(
-        ray.intersectObject(upperMesh).length,
-        0,
-        "CNC socket remains open with no leg solid",
+        legSiteHits.length,
+        1,
+        "CNC layer retains stock at each future leg socket",
+      );
+      assert.ok(
+        Math.abs(legSiteHits[0].point.z - laminate.thickness) < 1e-4,
+        "future socket has a solid top face",
       );
     }
   upper.dispose();

@@ -122,8 +122,8 @@ export function LeeStoolFabrication({
         <p className="assembly-mode-note">
           {f(s.length)} × {f(s.width)} × {f(lamination.thickness)} stock.
           {lamination.throughPockets
-            ? " Letter pockets and leg sockets cut through this layer."
-            : ` Letter pockets are ${f(lamination.pocketDepth)} deep; leg sockets cut through.`}
+            ? " Letter pockets and finger wells cut through this layer."
+            : ` Letter pockets are ${f(lamination.pocketDepth)} deep.`}
           {lamination.lowerPocketDepth > 1e-6
             ? ` The lower layer also needs ${f(lamination.lowerPocketDepth)} of pocket depth beneath the letters.`
             : " The lower layer supplies the remaining pocket floor."}
@@ -138,8 +138,8 @@ export function LeeStoolFabrication({
         <p className="assembly-mode-note">
           Includes top-edge and pocket-rim roundovers, a flat glue face, and the
           current fit clearances. Millimeter geometry with the bottom at Z = 0;
-          choose stock setup and toolpaths in CAM. Cut matching leg sockets in
-          the lower layer.
+          choose stock setup and toolpaths in CAM. Drill the leg sockets after
+          lamination.
         </p>
       </div>
       <div className="lee-stool-exports">

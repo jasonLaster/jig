@@ -496,15 +496,17 @@ export function createLeeStoolUpperLamination(p: ModelParams) {
 function createLeeTopGeometry(p: ModelParams, upperLamination: boolean) {
   const s = getLeeStoolSpec(p),
     positions: number[] = [];
-  const legHoles = [-1, 1].flatMap((x) =>
-    [-1, 1].map((y) =>
-      circle(
-        x * (s.length / 2 - s.legInset),
-        y * (s.width / 2 - s.legInset),
-        s.legDiameter / 2 + s.legClearance,
-      ).reverse(),
-    ),
-  );
+  const legHoles = upperLamination
+    ? []
+    : [-1, 1].flatMap((x) =>
+        [-1, 1].map((y) =>
+          circle(
+            x * (s.length / 2 - s.legInset),
+            y * (s.width / 2 - s.legInset),
+            s.legDiameter / 2 + s.legClearance,
+          ).reverse(),
+        ),
+      );
   const pockets = [0, 1, 2].map((i) => getLeeLetterContour(p, i, true));
   const edge = s.edgeRoundover;
   const bottomZ = upperLamination

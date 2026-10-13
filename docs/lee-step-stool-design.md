@@ -39,8 +39,8 @@ The inspector begins with Letter layout: height, width, horizontal gap and minim
 
 ## Upper-lamination CNC export
 
-The dedicated upper-lamination STL contains the upper half of the top alone, with thickness derived as half the finished top thickness. The bottom is a flat glue face at Z = 0, with centered XY coordinates and millimeter geometry. It shares the top-edge and pocket-rim roundovers, plan corners, sockets, finger wells and effective fit dimensions with the assembled model.
+The dedicated upper-lamination STL contains the upper half of the top alone, with thickness derived as half the finished top thickness. The bottom is a flat glue face at Z = 0, with centered XY coordinates and millimeter geometry. It shares the top-edge and pocket-rim roundovers, plan corners, finger wells and effective letter fit dimensions with the assembled model.
 
-At the selected 13 × 9 × 1.5-inch top and 0.75-inch pocket depth, the exported layer is 13 × 9 × 0.75 inches. Letters/finger wells and the four leg sockets are through-cuts in the upper layer. The lower layer provides the 0.75-inch pocket floor and requires matching leg sockets. If pocket depth is shallower than half the top thickness, the upper layer retains a blind floor. If deeper, the export contains through-pockets and the inspector reports the additional depth needed in the lower layer.
+At the selected 13 × 9 × 1.5-inch top and 0.75-inch pocket depth, the exported layer is 13 × 9 × 0.75 inches. Letters and finger wells are through-cuts in the upper layer. All four leg socket locations retain solid stock; the sockets are drilled after laminating the two layers. The lower layer provides the 0.75-inch pocket floor. If pocket depth is shallower than half the top thickness, the upper layer retains a blind floor. If deeper, the export contains through-pockets and the inspector reports the additional depth needed in the lower layer.
 
 This STL describes the finished upper part for CAM. Cutter selection, allowances, tabs, cut-through overshoot, workholding, stock origin and toolpaths are set in the CAM job. The glue face has no underside roundover.
