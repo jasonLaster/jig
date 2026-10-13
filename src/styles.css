@@ -4151,3 +4151,7 @@ html.dark .segmented-control button.active {
 }
 .lee-stool-presets button[aria-pressed="true"] { background: var(--accent); color: var(--accent-foreground); }
 .lee-stool-layout-controls .number-control { margin-top: 14px; }
+
+.lee-stool-access-controls .number-control { margin-top: 14px; }
+
+.lee-stool-presets button:disabled { opacity: 0.45; cursor: not-allowed; }

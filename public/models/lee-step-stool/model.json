@@ -165,6 +165,28 @@
       "description": "Thickness of each removable letter and the depth of its blind pocket. Letters sit flush with the top."
     },
     {
+      "key": "letterRoundover",
+      "label": "Letter top roundover",
+      "default": 1.5875,
+      "limits": {
+        "min": 0,
+        "max": 3.175,
+        "step": 0.25
+      },
+      "description": "Rounds the upper edge of each removable letter inward. Start with 1/16 inch. The straight-wall letter size and fit clearance stay unchanged; small strokes limit the radius."
+    },
+    {
+      "key": "pocketRoundover",
+      "label": "Pocket rim roundover",
+      "default": 1.5875,
+      "limits": {
+        "min": 0,
+        "max": 3.175,
+        "step": 0.25
+      },
+      "description": "Rounds the top edge facing each letter across the gap, including the finger well. Start with 1/16 inch. The mouth opens above the straight-wall fit; tight E notches and nearby sockets limit the radius."
+    },
+    {
       "key": "letterClearance",
       "label": "Letter clearance per side",
       "default": 0.96266,
@@ -173,7 +195,7 @@
         "max": 3.175,
         "step": 0.05
       },
-      "description": "Gap between a letter and its pocket on each side. Larger values make removal easier. The pocket grows by twice this value across its width and height; the letter size stays the same."
+      "description": "Gap between a letter and its pocket on each side. Larger values make removal easier. The pocket grows by twice this value across its width and height; the letter size stays the same. Workshop starting point: 0.8–1.2 mm per side after finishing; try 1.2–1.5 mm for easier lifting. Test a finished scrap sample; wood movement can tighten the fit."
     },
     {
       "key": "legClearance",
@@ -192,10 +214,10 @@
       "default": 9.525,
       "limits": {
         "min": 6.35,
-        "max": 12.7,
+        "max": 19.05,
         "step": 0.5
       },
-      "description": "Radius of the semicircular finger well below each letter, used to lift it out."
+      "description": "Radius of the semicircular lifting well. The circular part is twice the radius across; tangent entry curves widen the mouth. Try 3/8–1/2 inch for children and 1/2–5/8 inch for adults, then test the actual thumbs. Narrow letters limit the radius. For a measured thumb pad, start with a circular diameter 2–4 mm wider than the pad."
     }
   ],
   "audit": {
@@ -211,7 +233,8 @@
       "Keep pocket floors, fit gaps, sockets and rounded top in the same shared parametric geometry.",
       "Keep letter pockets separated from sockets and each other.",
       "Preserve eight closed solids in assembled and individual part exports.",
-      "Keep leg sockets inside the rounded top and normalize letter size and spacing to preserve the wood border."
+      "Keep leg sockets inside the rounded top and normalize letter size and spacing to preserve the wood border.",
+      "Keep independent letter-top and pocket-rim roundovers above the straight-wall fit, with simple face/mouth contours and positive pocket/socket webs."
     ],
     "checks": [
       {

@@ -258,3 +258,90 @@ test("explains fit clearances and persists values above the former limits", asyn
   await page.keyboard.press("Escape");
   await expect(page.getByRole("tooltip")).toHaveCount(0);
 });
+
+test("keeps independent upper roundovers, thumb presets and actual export profiles", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/?model=lee-step-stool&unit=mm&quality=high");
+  const letter = page.getByLabel("Letter top roundover in millimeters", {
+    exact: true,
+  });
+  const pocket = page.getByLabel("Pocket rim roundover in millimeters", {
+    exact: true,
+  });
+  await expect(letter).toHaveValue("1.6");
+  await expect(pocket).toHaveValue("1.6");
+  await letter.fill("2");
+  await letter.blur();
+  await pocket.fill("1");
+  await pocket.blur();
+  await expect(
+    page.getByLabel("Letter clearance per side in millimeters", {
+      exact: true,
+    }),
+  ).toHaveValue("0.96");
+  await page
+    .getByRole("group", { name: "Thumb access presets" })
+    .getByRole("button", { name: "Shared ½″" })
+    .click();
+  await expect(
+    page.getByLabel("Finger well radius in millimeters", { exact: true }),
+  ).toHaveValue("12.7");
+  await page.reload();
+  await expect(letter).toHaveValue("2.0");
+  await expect(pocket).toHaveValue("1.0");
+  await expect(page).toHaveURL(/letterRoundover=2(&|$)/);
+  await expect(page).toHaveURL(/pocketRoundover=1(&|$)/);
+  await expect(
+    page
+      .getByRole("group", { name: "Thumb access presets" })
+      .getByRole("button", { name: "Roomy ⅝″" }),
+  ).toBeDisabled();
+  await page.locator(".lee-stool-access-controls").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: ".playwright/lee-stool-edge-controls.png" });
+  await page.getByText("Assembly & exports", { exact: true }).click();
+  const download = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export Letter L STL", exact: true })
+    .click();
+  const file = testInfo.outputPath("rounded-letter.stl");
+  await (await download).saveAs(file);
+  await checkStl(file, 19.05);
+  const data = await fs.readFile(file);
+  const xs: number[] = [],
+    topXs: number[] = [],
+    zs = new Set<number>();
+  for (let i = 0; i < data.readUInt32LE(80); i++)
+    for (let j = 0; j < 3; j++) {
+      const x = data.readFloatLE(84 + i * 50 + 12 + j * 12),
+        z = data.readFloatLE(84 + i * 50 + 12 + j * 12 + 8);
+      xs.push(x);
+      zs.add(Number(z.toFixed(3)));
+      if (Math.abs(z - 19.05) < 0.0001) topXs.push(x);
+    }
+  expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(50.8, 3);
+  expect(Math.max(...topXs) - Math.min(...topXs)).toBeCloseTo(46.8, 3);
+  expect(zs.size).toBeGreaterThan(5);
+  const svgDownload = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download full-size layout SVG" })
+    .click();
+  const svgFile = testInfo.outputPath("rounded-layout.svg");
+  await (await svgDownload).saveAs(svgFile);
+  expect(await fs.readFile(svgFile, "utf8")).toContain(
+    'stroke-dasharray="2 1"',
+  );
+  await page
+    .getByRole("button", { name: "Lift letters & separate legs" })
+    .click();
+  await page.screenshot({
+    path: ".playwright/lee-stool-rounded-edges-exploded.png",
+  });
+  await page
+    .getByRole("button", { name: "Open Plate Table", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Plate Table", exact: true }),
+  ).toBeVisible();
+  await expect(page).not.toHaveURL(/(?:letterRoundover|pocketRoundover)=/);
+});

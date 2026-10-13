@@ -265,7 +265,7 @@ const DEFAULT_MODEL_ID = "japandi-tray";
 const DEFAULT_LENGTH_UNIT: LengthUnit = "in";
 const PARAM_QUERY_KEYS = [
   "letterWidth", "letterMargin", "cornerRadius", "legHeight", "legDiameter", "legInset", "letterHeight", "letterGap",
-  "letterDepth", "letterClearance", "legClearance", "fingerRadius", "edgeRoundover",
+  "letterRoundover", "pocketRoundover", "letterDepth", "letterClearance", "legClearance", "fingerRadius", "edgeRoundover",
   "height",
   "diameter",
   "tubeDiameter",
@@ -6769,6 +6769,66 @@ export default function App({
                         );
                       })}
                     </section>
+                    <section className="panel-section lee-stool-access-controls">
+                      <h2>Edges & thumb access</h2>
+                      {[
+                        "letterRoundover",
+                        "pocketRoundover",
+                        "letterClearance",
+                        "fingerRadius",
+                      ].map((key) => {
+                        const parameter = model.parameters.find((p) => p.key === key)!;
+                        return (
+                          <NumberControl
+                            key={key}
+                            label={parameter.label}
+                            description={parameter.description}
+                            valueMm={params[key]}
+                            unit={unit}
+                            limits={getParameterLimits(model, params, key)}
+                            preferFineStep
+                            precisionDigits={key === "letterClearance" ? 2 : undefined}
+                            onUnitChange={setUnit}
+                            onChange={(value) => updateParam(key, value)}
+                          />
+                        );
+                      })}
+                      <div
+                        className="lee-stool-presets"
+                        role="group"
+                        aria-label="Thumb access presets"
+                      >
+                        {[
+                          ["Child ⅜″", 9.525],
+                          ["Shared ½″", 12.7],
+                          ["Roomy ⅝″", 15.875],
+                        ].map(([label, radius]) => (
+                          <button
+                            key={label}
+                            type="button"
+                            disabled={
+                              Number(radius) >
+                              getParameterLimits(model, params, "fingerRadius").max + 0.02
+                            }
+                            title={
+                              Number(radius) >
+                              getParameterLimits(model, params, "fingerRadius").max + 0.02
+                                ? "Widen the letters or reduce the pocket rim radius for this well size."
+                                : undefined
+                            }
+                            aria-pressed={Math.abs(params.fingerRadius - Number(radius)) < 0.02}
+                            onClick={() => updateParam("fingerRadius", Number(radius))}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="assembly-mode-note">
+                        Workshop starting points: 0.8–1.2 mm gap per side; 1.2–1.5 mm for easier
+                        lifting. Child wells: ⅜–½″ radius. Adult wells: ½–⅝″ radius. Try ½″ for
+                        shared use. Test a finished scrap sample with the intended thumbs.
+                      </p>
+                    </section>
                     <details className="lee-stool-fabrication-details">
                       <summary>Assembly & exports</summary>
                       <LeeStoolFabrication
@@ -6871,7 +6931,7 @@ export default function App({
                     />
                   ) : model.parameters
                     .filter((parameter) => {
-                      if (model.viewer === "lee-step-stool-v1" && ["letterHeight", "letterWidth", "letterGap", "letterMargin", "legHeight", "legDiameter"].includes(parameter.key)) return false;
+                      if (model.viewer === "lee-step-stool-v1" && ["letterHeight", "letterWidth", "letterGap", "letterMargin", "legHeight", "legDiameter", "letterRoundover", "pocketRoundover", "letterClearance", "fingerRadius"].includes(parameter.key)) return false;
                       if (
                         model.viewer === "dining-table-v1" &&
                         Number.isFinite(params.legGrooveEnabled) &&

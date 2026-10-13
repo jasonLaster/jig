@@ -72,6 +72,15 @@ export function LeeStoolFabrication({
           {f(s.letterHeight)} tall × {f(s.letterWidth)} wide ×{" "}
           {f(s.letterDepth)} thick
         </dd>
+        <dt>Upper edge radii</dt>
+        <dd>
+          Letter {f(s.letterRoundover)} · pocket rim {f(s.pocketRoundover)}
+        </dd>
+        <dt>Thumb access</dt>
+        <dd>
+          {f(2 * s.fingerRadius)} circular diameter · {f(s.fingerRadius)} well
+          radius
+        </dd>
         <dt>Pocket floor</dt>
         <dd>{f(s.floorThickness)} remaining</dd>
       </dl>
@@ -91,7 +100,8 @@ export function LeeStoolFabrication({
       </button>
       <p className="assembly-mode-note">
         Print the layout at 100%. Fit clearances are per side; make a scrap fit
-        test with your finish.
+        test with your finish. Black lines mark the straight pocket walls;
+        dashed amber lines show the rounded mouths; blue lines mark the letters.
       </p>
       <div className="lee-stool-exports">
         {["Top", "Leg", "Letter L", "First E", "Second E"].map((label, i) => (
@@ -106,7 +116,7 @@ export function LeeStoolFabrication({
         ))}
       </div>
       <p className="assembly-mode-note">
-        Default: 12½″ × 9½″ top, 6″ leg clearance and 1½″ legs. Letter layout,
+        Default: 13″ × 9″ top, 6¼″ leg clearance and 1¼″ legs. Letter layout,
         roundovers and fit are inferred from the illustration. No load rating is
         established.
       </p>

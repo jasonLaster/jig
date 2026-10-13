@@ -65,6 +65,8 @@ const selectedInches = {
   letterClearance: 0.0379,
   legClearance: 0.0197,
   fingerRadius: 0.375,
+  letterRoundover: 0.0625,
+  pocketRoundover: 0.0625,
 };
 for (const [key, inches] of Object.entries(selectedInches)) {
   assert.ok(
@@ -162,7 +164,7 @@ cases.push({
   width: 215.9,
 });
 let seed = 20261010;
-for (let sample = 0; sample < 16; sample++)
+for (let sample = 0; sample < 64; sample++)
   cases.push(
     Object.fromEntries(
       model.parameters.map((parameter) => {
@@ -189,7 +191,40 @@ for (const [caseIndex, p] of cases.entries()) {
     if (i > 0) verifyGeometry(part.geometry, `case ${caseIndex} ${part.name}`);
     part.geometry.dispose();
   }
-  const letters = [0, 1, 2].map((i) => module.getLeeLetterContour(p, i, true));
+  const letters = [0, 1, 2].map((i) => module.getLeePocketMouthContour(p, i));
+  for (let index = 0; index < 3; index++) {
+    for (const contour of [
+      letters[index],
+      module.getLeeLetterFaceContour(p, index),
+    ]) {
+      const cross = (a, b, c) =>
+        (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+      for (let i = 0; i < contour.length; i++) {
+        const a = contour[i],
+          b = contour[(i + 1) % contour.length];
+        for (let j = i + 2; j < contour.length; j++) {
+          if (i === 0 && j === contour.length - 1) continue;
+          const c = contour[j],
+            d = contour[(j + 1) % contour.length];
+          assert.ok(
+            !(
+              cross(a, b, c) * cross(a, b, d) < -1e-10 &&
+              cross(c, d, a) * cross(c, d, b) < -1e-10
+            ),
+            `case ${caseIndex}: self-intersecting face/mouth`,
+          );
+        }
+      }
+    }
+  }
+  assert.ok(s.letterDepth - Math.max(s.letterRoundover, s.pocketRoundover) > 0);
+  const fitted = module.normalizeLeeStoolParams(p);
+  for (const [key, value] of Object.entries(fitted)) {
+    assert.ok(
+      Math.abs(module.normalizeLeeStoolParams(fitted)[key] - value) < 1e-6,
+      `case ${caseIndex}: idempotent ${key}`,
+    );
+  }
   const bounds = letters.map((c) => ({
     minX: Math.min(...c.map((v) => v.x)),
     maxX: Math.max(...c.map((v) => v.x)),
@@ -222,6 +257,33 @@ for (const [caseIndex, p] of cases.entries()) {
       }
   }
 }
+// Roundovers remove actual solid material while preserving the straight-wall fit.
+for (const [key, index] of [
+  ["letterRoundover", 5],
+  ["pocketRoundover", 0],
+]) {
+  const square = { ...defaults, [key]: 0 };
+  const rounded = { ...defaults, [key]: 1.5875 };
+  const squareParts = module.createLeeStoolParts(square);
+  const roundedParts = module.createLeeStoolParts(rounded);
+  assert.ok(
+    verifyGeometry(roundedParts[index].geometry, key) <
+      verifyGeometry(squareParts[index].geometry, key),
+    `${key}: removes material`,
+  );
+  for (let letter = 0; letter < 3; letter++) {
+    assert.deepEqual(
+      module.getLeeLetterContour(square, letter),
+      module.getLeeLetterContour(rounded, letter),
+    );
+    assert.deepEqual(
+      module.getLeeLetterContour(square, letter, true),
+      module.getLeeLetterContour(rounded, letter, true),
+    );
+  }
+  [...squareParts, ...roundedParts].forEach((part) => part.geometry.dispose());
+}
+
 {
   const parts = module.createLeeStoolParts(defaults),
     group = new Group();
