@@ -211,7 +211,7 @@
     {
       "key": "fingerRadius",
       "label": "Finger well radius",
-      "default": 9.525,
+      "default": 12.7,
       "limits": {
         "min": 6.35,
         "max": 19.05,

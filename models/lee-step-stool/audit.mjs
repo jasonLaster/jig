@@ -64,7 +64,7 @@ const selectedInches = {
   letterDepth: 0.75,
   letterClearance: 0.0379,
   legClearance: 0.0197,
-  fingerRadius: 0.375,
+  fingerRadius: 0.5,
   letterRoundover: 0.0625,
   pocketRoundover: 0.0625,
 };

@@ -192,9 +192,12 @@ test("edits rounded letter layout independently and uses shorter thicker leg pre
   await expect(
     page.getByLabel("Leg diameter in inches", { exact: true }),
   ).toHaveValue("2");
-  await expect(height).toHaveValue("3");
+  // Two-inch legs plus the shared half-inch wells need a shorter letter
+  // to preserve the wood web around the future sockets. Width stays independent.
+  await expect(height).toHaveValue("2 3/4");
   await expect(width).toHaveValue("2 1/4");
   await page.reload();
+  await expect(height).toHaveValue("2 3/4");
   await expect(
     page.getByLabel("Leg diameter in inches", { exact: true }),
   ).toHaveValue("2");
@@ -354,6 +357,9 @@ test("exports the half-thickness CNC upper lamination with through cuts or a bli
   await expect(
     page.getByRole("heading", { name: "Upper lamination · CNC" }),
   ).toBeVisible();
+  await expect(
+    page.getByLabel("Finger well radius in inches", { exact: true }),
+  ).toHaveValue("1/2");
   const cnc = page.locator(".lee-stool-cnc-export");
   await expect(cnc).toContainText("13 in × 9 in × 3/4 in stock");
   await expect(cnc).toContainText("Drill the leg sockets after lamination");
